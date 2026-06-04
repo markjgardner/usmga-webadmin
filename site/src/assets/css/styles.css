@@ -1,0 +1,51 @@
+:root {
+  --ink: #080a0c;
+  --muted: #535b64;
+  --line: #d9dee5;
+  --paper: #fbfaf7;
+  --panel: #ffffff;
+  --accent: #8f1d2c;
+  --accent-dark: #64121d;
+  --blue: #123f65;
+  --shadow: 0 18px 45px rgba(8, 10, 12, 0.12);
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--ink); background: var(--paper); font-family: "Open Sans", Arial, sans-serif; font-size: 17px; line-height: 1.75; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; }
+.site-header { position: sticky; top: 0; z-index: 10; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line); backdrop-filter: blur(8px); }
+.nav-shell { max-width: 1180px; margin: 0 auto; padding: .75rem 1rem; display: flex; align-items: center; gap: 1rem; }
+.brand { display: flex; align-items: center; gap: .65rem; color: var(--ink); text-decoration: none; font-family: "Patua One", serif; text-transform: uppercase; letter-spacing: 2px; font-size: 1.45rem; white-space: nowrap; }
+.brand img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; box-shadow: 0 2px 10px rgba(0,0,0,.16); }
+.nav-list { list-style: none; margin: 0 0 0 auto; padding: 0; display: flex; flex-wrap: wrap; gap: .25rem .55rem; justify-content: flex-end; }
+.nav-list a { display: block; padding: .45rem .55rem; border-radius: 999px; color: var(--ink); text-decoration: none; font-family: Montserrat, Arial, sans-serif; font-size: .74rem; text-transform: uppercase; letter-spacing: 1.7px; }
+.nav-list a:hover, .nav-list a[aria-current="page"] { background: var(--accent); color: white; }
+.nav-toggle, .nav-toggle-label { display: none; }
+.hero { background: linear-gradient(120deg, rgba(18,63,101,.96), rgba(143,29,44,.88)); color: white; min-height: 260px; display: grid; align-items: center; }
+.hero-image { background-image: linear-gradient(120deg, rgba(8,10,12,.72), rgba(18,63,101,.58)), var(--hero-image); background-size: cover; background-position: center; }
+.hero-inner { max-width: 1180px; margin: 0 auto; padding: 4.5rem 1rem; width: 100%; }
+.eyebrow { font-family: Montserrat, Arial, sans-serif; text-transform: uppercase; letter-spacing: 3px; font-size: .82rem; font-weight: 700; margin: 0 0 .75rem; }
+h1, h2, h3 { font-family: "Patua One", Georgia, serif; text-transform: uppercase; letter-spacing: 2px; line-height: 1.18; color: inherit; }
+h1 { margin: 0; font-size: clamp(2.4rem, 8vw, 4.6rem); letter-spacing: 5px; }
+h2 { margin: 2rem 0 .75rem; font-size: clamp(1.65rem, 4vw, 2.2rem); }
+h3 { margin: 1.3rem 0 .5rem; font-size: 1.25rem; }
+.content-shell { max-width: 1120px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+.content-card, .blog-post, .document-list, .board-grid, .intro-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: clamp(1.15rem, 3vw, 2rem); margin: 1.15rem 0; box-shadow: var(--shadow); }
+.content-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; align-items: start; }
+.button, .wsite-button { display: inline-block; margin: .35rem .4rem .35rem 0; padding: .75rem 1rem; border-radius: 999px; background: var(--accent); color: white; text-decoration: none; font-family: Montserrat, Arial, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 1.4px; font-size: .82rem; }
+.button:hover, .wsite-button:hover { background: var(--accent-dark); }
+.figure-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 1rem; }
+figure { margin: 1rem 0; }
+figure img { border-radius: 16px; box-shadow: 0 10px 28px rgba(0,0,0,.16); background: white; }
+.blog-post h2 { margin-top: 0; }
+.blog-date { color: var(--muted); font-family: Montserrat, Arial, sans-serif; font-size: .85rem; text-transform: uppercase; letter-spacing: 1px; }
+.site-footer { padding: 2rem 1rem; text-align: center; background: var(--ink); color: white; }
+.site-footer a { color: white; }
+@media (max-width: 860px) {
+  .nav-shell { align-items: flex-start; flex-wrap: wrap; }
+  .nav-toggle-label { display: block; margin-left: auto; padding: .55rem .8rem; border: 1px solid var(--line); border-radius: 999px; font-family: Montserrat, Arial, sans-serif; text-transform: uppercase; letter-spacing: 1px; }
+  .nav-list { display: none; flex-basis: 100%; width: 100%; padding-top: .5rem; }
+  .nav-toggle:checked ~ .nav-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nav-list a { border-radius: 12px; padding: .65rem; background: #f1f3f5; }
+  .hero-inner { padding: 3.5rem 1rem; }
+}

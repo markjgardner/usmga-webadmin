@@ -1,0 +1,14 @@
+[
+  { "title": "Home", "url": "/" },
+  { "title": "Competitions", "url": "/usmga-competitions.html" },
+  { "title": "Sponsor Us", "url": "/sponsor-us.html" },
+  { "title": "Join USMGA", "url": "/join-usmga.html" },
+  { "title": "Nations Prospectus", "url": "/nations-prospectus.html" },
+  { "title": "International", "url": "/international.html" },
+  { "title": "Contact Board", "url": "/contact-our-board.html" },
+  { "title": "Documents", "url": "/documents.html" },
+  { "title": "Newsletter", "url": "/newsletter.html" },
+  { "title": "Rules", "url": "/rules.html" },
+  { "title": "Bylaws", "url": "/bylaws.html" },
+  { "title": "Constitution", "url": "/con.html" }
+]

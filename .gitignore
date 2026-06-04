@@ -1,0 +1,16 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+*.user
+
+# Azure Functions local settings (may contain secrets)
+func/**/local.settings.json
+local.settings.json
+
+# Node / Eleventy
+node_modules/
+site/_site/
+
+# Logs and OS files
+*.log
+.DS_Store

@@ -1,0 +1,22 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "Storage:ConnectionString": "UseDevelopmentStorage=true",
+    "Storage:TableName": "SmsRequests",
+    "GitHub:Owner": "markjgardner",
+    "GitHub:Repo": "usmga-webadmin",
+    "GitHub:Token": "@Microsoft.KeyVault(SecretUri=https://YOUR-VAULT.vault.azure.net/secrets/github-fgpat/)",
+    "GitHub:ApiBaseUrl": "https://api.github.com",
+    "GitHub:CopilotLogin": "copilot-swe-agent",
+    "GitHub:CopilotAssignee": "copilot-swe-agent[bot]",
+    "Sms:FromNumber": "+15551234567",
+    "Sms:Endpoint": "https://YOUR-ACS.communication.azure.com",
+    "Sms:ConnectionString": "",
+    "Sms:Allowlist": "+15550000001,+15550000002",
+    "Sms:UploadBaseUrl": "https://example.com/upload",
+    "Notify:SharedSecret": "local-dev-secret",
+    "Notify:HeaderName": "x-usmga-notify-secret"
+  }
+}

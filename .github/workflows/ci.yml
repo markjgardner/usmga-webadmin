@@ -1,0 +1,68 @@
+name: CI
+
+# Runs on every pull request with NO `paths:` filter on purpose: these jobs are
+# required status checks for branch protection. A path filter would leave a required
+# context permanently "pending" on PRs that don't touch that path, deadlocking merges.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  site-build:
+    name: Site build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+  function-build-test:
+    name: Function build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build function solution
+        run: dotnet build func/Usmga.Func.sln --configuration Release
+
+      - name: Test function solution
+        run: dotnet test func/Usmga.Func.sln --configuration Release --no-build
+
+  infra-bicep:
+    name: Infra Bicep validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Bicep templates
+        uses: Azure/cli@v2
+        with:
+          inlineScript: az bicep build --file infra/main.bicep

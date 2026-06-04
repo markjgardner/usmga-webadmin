@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "environmentName": {
+      "value": "test"
+    },
+    "namePrefix": {
+      "value": "usmga"
+    },
+    "acsDataLocation": {
+      "value": "United States"
+    },
+    "acsLocation": {
+      "value": "Global"
+    },
+    "staticWebAppLocation": {
+      "value": "eastus2"
+    },
+    "smsHandlerFunctionName": {
+      "value": "SmsInbound"
+    },
+    "eventGridDestinationType": {
+      "value": "AzureFunction"
+    },
+    "githubCredentialSecretName": {
+      "value": "github-credential"
+    },
+    "acsConnectionStringSecretName": {
+      "value": "acs-connection-string"
+    },
+    "correlationTableName": {
+      "value": "SmsCorrelation"
+    },
+    "tags": {
+      "value": {
+        "project": "usmga-webadmin",
+        "environment": "test",
+        "workload": "sms-website-change-pipeline",
+        "managedBy": "bicep"
+      }
+    }
+  }
+}

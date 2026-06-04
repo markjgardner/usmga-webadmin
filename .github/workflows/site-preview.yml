@@ -1,0 +1,90 @@
+name: Site Preview
+
+# Keep this workflow on pull_request rather than pull_request_target: it uses deployment
+# secrets, and pull_request_target would expose them to untrusted fork code. Copilot
+# coding-agent PRs are same-repository copilot/* branches, so pull_request secrets are
+# available after any required workflow approval.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'site/**'
+      - '.github/workflows/site-preview.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: site-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    name: Deploy site preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Build site
+        working-directory: site
+        run: npm run build
+
+      - name: Deploy Azure Static Web Apps preview
+        id: deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: site
+          output_location: _site
+          skip_app_build: true
+
+      - name: Notify requester of preview URL
+        if: always() && steps.deploy.outcome == 'success'
+        env:
+          NOTIFY_FUNCTION_URL: ${{ secrets.NOTIFY_FUNCTION_URL }}
+          NOTIFY_SHARED_SECRET: ${{ secrets.NOTIFY_SHARED_SECRET }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.static_web_app_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEPLOYED_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NOTIFY_FUNCTION_URL}" ] || [ -z "${NOTIFY_SHARED_SECRET}" ]; then
+            echo "NotifyRequester secrets are not configured; skipping SMS notification."
+            exit 0
+          fi
+          if [ -z "${PREVIEW_URL}" ]; then
+            echo "Static Web Apps deploy did not expose static_web_app_url; skipping SMS notification."
+            exit 0
+          fi
+          payload=$(jq -n \
+            --argjson prNumber "${PR_NUMBER}" \
+            --arg previewUrl "${PREVIEW_URL}" \
+            --arg deployedSha "${DEPLOYED_SHA}" \
+            '{prNumber: $prNumber, previewUrl: $previewUrl, deployedSha: $deployedSha}')
+          status=$(curl --silent --show-error --output notify-response.txt --write-out '%{http_code}' \
+            --request POST "${NOTIFY_FUNCTION_URL}" \
+            --header 'content-type: application/json' \
+            --header "x-usmga-notify-secret: ${NOTIFY_SHARED_SECRET}" \
+            --data "${payload}" || true)
+          if [ "${status}" -lt 200 ] || [ "${status}" -ge 300 ]; then
+            echo "NotifyRequester call failed with HTTP ${status}. Response follows:"
+            cat notify-response.txt || true
+            echo "Failing the job so the missing requester notification is visible and can be retried by re-running the workflow."
+            exit 1
+          fi
+          echo "NotifyRequester accepted preview notification for PR #${PR_NUMBER}."

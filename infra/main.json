@@ -1,0 +1,1242 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.43.8.12551",
+      "templateHash": "4280205488527491824"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for regional resources."
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "defaultValue": "test",
+      "minLength": 2,
+      "maxLength": 12,
+      "metadata": {
+        "description": "Short environment name such as test, staging, or prod."
+      }
+    },
+    "namePrefix": {
+      "type": "string",
+      "defaultValue": "usmga",
+      "minLength": 2,
+      "maxLength": 12,
+      "metadata": {
+        "description": "Short resource name prefix. Use lowercase letters/numbers/hyphens where supported."
+      }
+    },
+    "acsDataLocation": {
+      "type": "string",
+      "defaultValue": "United States",
+      "metadata": {
+        "description": "Data residency location for Azure Communication Services data, for example United States or Europe."
+      }
+    },
+    "acsLocation": {
+      "type": "string",
+      "defaultValue": "Global",
+      "metadata": {
+        "description": "Azure region for Azure Communication Services resource metadata. ACS is commonly deployed as Global."
+      }
+    },
+    "staticWebAppLocation": {
+      "type": "string",
+      "defaultValue": "eastus2",
+      "metadata": {
+        "description": "Azure Static Web Apps region. Choose a region supported by Static Web Apps."
+      }
+    },
+    "smsHandlerFunctionName": {
+      "type": "string",
+      "defaultValue": "SmsInbound",
+      "metadata": {
+        "description": "Name of the Function in the Function App that receives Event Grid SMS events. Must match the [Function(...)] name in the function code. Deploy function code before creating or validating the Event Grid AzureFunction destination."
+      }
+    },
+    "eventGridDestinationType": {
+      "type": "string",
+      "defaultValue": "AzureFunction",
+      "allowedValues": [
+        "AzureFunction",
+        "WebHook"
+      ],
+      "metadata": {
+        "description": "Event Grid destination mode. Use AzureFunction after function code exists; use WebHook when passing a secured endpoint URL at deployment time."
+      }
+    },
+    "eventGridWebhookEndpointUrl": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Webhook endpoint URL for Event Grid when eventGridDestinationType is WebHook. Do not store secret-bearing URLs in parameter files."
+      }
+    },
+    "githubCredentialSecretName": {
+      "type": "string",
+      "defaultValue": "github-credential",
+      "metadata": {
+        "description": "Name of the Key Vault secret that operators will create for the GitHub PAT or GitHub App credential."
+      }
+    },
+    "acsConnectionStringSecretName": {
+      "type": "string",
+      "defaultValue": "acs-connection-string",
+      "metadata": {
+        "description": "Name of the Key Vault secret that operators will create for the ACS connection string."
+      }
+    },
+    "notifySharedSecretName": {
+      "type": "string",
+      "defaultValue": "notify-shared-secret",
+      "metadata": {
+        "description": "Name of the Key Vault secret that operators will create for the shared secret used to authenticate the workflow -> NotifyRequester callback. Must match the NOTIFY_SHARED_SECRET GitHub Actions secret."
+      }
+    },
+    "smsFromNumber": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "ACS-provisioned phone number used as the SMS From address, in E.164 format (for example +15551234567)."
+      }
+    },
+    "smsAllowlist": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Comma-separated allowlist of E.164 phone numbers permitted to submit change requests."
+      }
+    },
+    "correlationTableName": {
+      "type": "string",
+      "defaultValue": "SmsCorrelation",
+      "metadata": {
+        "description": "Storage table name used for SMS/GitHub correlation state."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "project": "usmga-webadmin",
+        "workload": "sms-website-change-pipeline"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources."
+      }
+    }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id)]",
+    "normalizedPrefix": "[toLower(replace(parameters('namePrefix'), '-', ''))]",
+    "normalizedEnvironment": "[toLower(replace(parameters('environmentName'), '-', ''))]",
+    "baseName": "[toLower(format('{0}-{1}-{2}', parameters('namePrefix'), parameters('environmentName'), variables('suffix')))]",
+    "staticWebAppName": "[format('{0}-swa', variables('baseName'))]",
+    "communicationServiceName": "[format('{0}-acs', variables('baseName'))]",
+    "eventGridSystemTopicName": "[format('{0}-acs-egst', variables('baseName'))]",
+    "eventGridSubscriptionName": "sms-received-to-function",
+    "storageAccountName": "[format('{0}st{1}', take(format('{0}{1}', variables('normalizedPrefix'), variables('normalizedEnvironment')), 9), variables('suffix'))]",
+    "workspaceName": "[format('{0}-law', variables('baseName'))]",
+    "appInsightsName": "[format('{0}-appi', variables('baseName'))]",
+    "keyVaultName": "[format('{0}kv{1}', take(format('{0}{1}', variables('normalizedPrefix'), variables('normalizedEnvironment')), 9), variables('suffix'))]",
+    "planName": "[format('{0}-plan', variables('baseName'))]",
+    "functionAppName": "[format('{0}-func', variables('baseName'))]"
+  },
+  "resources": {
+    "monitoring": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "monitoring",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "workspaceName": {
+            "value": "[variables('workspaceName')]"
+          },
+          "appInsightsName": {
+            "value": "[variables('appInsightsName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "6007558420304135583"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for monitoring resources."
+              }
+            },
+            "workspaceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Log Analytics workspace."
+              }
+            },
+            "appInsightsName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Application Insights component."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to resources."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('workspaceName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": 30,
+                "features": {
+                  "enableLogAccessUsingOnlyResourcePermissions": true
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('appInsightsName')]",
+              "location": "[parameters('location')]",
+              "kind": "web",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "workspaceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]"
+            },
+            "appInsightsId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/components', parameters('appInsightsName'))]"
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').ConnectionString]"
+            },
+            "appInsightsInstrumentationKey": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('appInsightsName')), '2020-02-02').InstrumentationKey]"
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "storage",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('storageAccountName')]"
+          },
+          "correlationTableName": {
+            "value": "[parameters('correlationTableName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "11248080986143501671"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the storage account."
+              }
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Globally unique storage account name, 3-24 lowercase letters and numbers."
+              }
+            },
+            "correlationTableName": {
+              "type": "string",
+              "defaultValue": "SmsCorrelation",
+              "metadata": {
+                "description": "Name of the table used for SMS/GitHub correlation state."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to the resource."
+              }
+            }
+          },
+          "resources": {
+            "storageAccount": {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "allowBlobPublicAccess": false,
+                "allowSharedKeyAccess": true,
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true,
+                "defaultToOAuthAuthentication": true,
+                "publicNetworkAccess": "Enabled",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Allow"
+                }
+              }
+            },
+            "tableService": {
+              "type": "Microsoft.Storage/storageAccounts/tableServices",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
+              "dependsOn": [
+                "storageAccount"
+              ]
+            },
+            "correlationTable": {
+              "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'default', parameters('correlationTableName'))]",
+              "dependsOn": [
+                "tableService"
+              ]
+            }
+          },
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "resourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', parameters('name'))]"
+            },
+            "tableName": {
+              "type": "string",
+              "value": "[parameters('correlationTableName')]"
+            },
+            "connectionString": {
+              "type": "securestring",
+              "value": "[format('DefaultEndpointsProtocol=https;AccountName={0};AccountKey={1};EndpointSuffix={2}', parameters('name'), listKeys('storageAccount', '2023-05-01').keys[0].value, environment().suffixes.storage)]"
+            }
+          }
+        }
+      }
+    },
+    "keyVault": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "key-vault",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "name": {
+            "value": "[variables('keyVaultName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "8972328741542092868"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the Key Vault."
+              }
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Key Vault."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to the resource."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.KeyVault/vaults",
+              "apiVersion": "2023-07-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "tenantId": "[tenant().tenantId]",
+                "sku": {
+                  "family": "A",
+                  "name": "standard"
+                },
+                "enableRbacAuthorization": true,
+                "enabledForTemplateDeployment": false,
+                "enableSoftDelete": true,
+                "softDeleteRetentionInDays": 90,
+                "enablePurgeProtection": true,
+                "publicNetworkAccess": "Enabled",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Allow"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "resourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.KeyVault/vaults', parameters('name'))]"
+            },
+            "vaultUri": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('name')), '2023-07-01').vaultUri]"
+            }
+          }
+        }
+      }
+    },
+    "functionApp": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "function-app",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "planName": {
+            "value": "[variables('planName')]"
+          },
+          "functionAppName": {
+            "value": "[variables('functionAppName')]"
+          },
+          "storageConnectionString": {
+            "value": "[listOutputsWithSecureValues('storage', '2025-04-01').connectionString]"
+          },
+          "appInsightsConnectionString": {
+            "value": "[reference('monitoring').outputs.appInsightsConnectionString.value]"
+          },
+          "keyVaultUri": {
+            "value": "[reference('keyVault').outputs.vaultUri.value]"
+          },
+          "githubCredentialSecretName": {
+            "value": "[parameters('githubCredentialSecretName')]"
+          },
+          "acsConnectionStringSecretName": {
+            "value": "[parameters('acsConnectionStringSecretName')]"
+          },
+          "notifySharedSecretName": {
+            "value": "[parameters('notifySharedSecretName')]"
+          },
+          "smsFromNumber": {
+            "value": "[parameters('smsFromNumber')]"
+          },
+          "smsAllowlist": {
+            "value": "[parameters('smsAllowlist')]"
+          },
+          "correlationTableName": {
+            "value": "[parameters('correlationTableName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "9739020039536108772"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the Function App and plan."
+              }
+            },
+            "planName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Linux Consumption hosting plan."
+              }
+            },
+            "functionAppName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Function App."
+              }
+            },
+            "storageConnectionString": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Storage connection string used by Azure Functions runtime and Table storage correlation state."
+              }
+            },
+            "appInsightsConnectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "Application Insights connection string."
+              }
+            },
+            "keyVaultUri": {
+              "type": "string",
+              "metadata": {
+                "description": "Key Vault URI used to build Key Vault references, for example https://myvault.vault.azure.net/."
+              }
+            },
+            "githubCredentialSecretName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Key Vault secret that will contain the GitHub token or app credential."
+              }
+            },
+            "acsConnectionStringSecretName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Key Vault secret that will contain the Azure Communication Services connection string."
+              }
+            },
+            "notifySharedSecretName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Key Vault secret that will contain the shared secret used to authenticate the workflow -> NotifyRequester callback."
+              }
+            },
+            "smsFromNumber": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "ACS-provisioned phone number used as the SMS From address, in E.164 format."
+              }
+            },
+            "smsAllowlist": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Comma-separated allowlist of E.164 phone numbers permitted to submit change requests."
+              }
+            },
+            "correlationTableName": {
+              "type": "string",
+              "defaultValue": "SmsCorrelation",
+              "metadata": {
+                "description": "Name of the storage table used by the function app for SMS/GitHub correlation state."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to resources."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/serverfarms",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('planName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "functionapp,linux",
+              "sku": {
+                "name": "Y1",
+                "tier": "Dynamic"
+              },
+              "properties": {
+                "reserved": true
+              }
+            },
+            {
+              "type": "Microsoft.Web/sites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('functionAppName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "kind": "functionapp,linux",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]",
+                "httpsOnly": true,
+                "publicNetworkAccess": "Enabled",
+                "clientAffinityEnabled": false,
+                "siteConfig": {
+                  "linuxFxVersion": "DOTNET-ISOLATED|8.0",
+                  "ftpsState": "FtpsOnly",
+                  "minTlsVersion": "1.2",
+                  "http20Enabled": true,
+                  "alwaysOn": false,
+                  "appSettings": [
+                    {
+                      "name": "AzureWebJobsStorage",
+                      "value": "[parameters('storageConnectionString')]"
+                    },
+                    {
+                      "name": "FUNCTIONS_EXTENSION_VERSION",
+                      "value": "~4"
+                    },
+                    {
+                      "name": "FUNCTIONS_WORKER_RUNTIME",
+                      "value": "dotnet-isolated"
+                    },
+                    {
+                      "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                      "value": "[parameters('appInsightsConnectionString')]"
+                    },
+                    {
+                      "name": "Storage__ConnectionString",
+                      "value": "[parameters('storageConnectionString')]"
+                    },
+                    {
+                      "name": "Storage__TableName",
+                      "value": "[parameters('correlationTableName')]"
+                    },
+                    {
+                      "name": "GitHub__Token",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('githubCredentialSecretName'))]"
+                    },
+                    {
+                      "name": "Sms__ConnectionString",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('acsConnectionStringSecretName'))]"
+                    },
+                    {
+                      "name": "Sms__FromNumber",
+                      "value": "[parameters('smsFromNumber')]"
+                    },
+                    {
+                      "name": "Sms__Allowlist",
+                      "value": "[parameters('smsAllowlist')]"
+                    },
+                    {
+                      "name": "Notify__SharedSecret",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('notifySharedSecretName'))]"
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('planName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('functionAppName')]"
+            },
+            "resourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/sites', parameters('functionAppName'))]"
+            },
+            "principalId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '2023-12-01', 'full').identity.principalId]"
+            },
+            "defaultHostname": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/sites', parameters('functionAppName')), '2023-12-01').defaultHostName]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "keyVault",
+        "monitoring",
+        "storage"
+      ]
+    },
+    "keyVaultRoleAssignment": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "key-vault-secret-reader",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "keyVaultResourceId": {
+            "value": "[reference('keyVault').outputs.resourceId.value]"
+          },
+          "principalId": {
+            "value": "[reference('functionApp').outputs.principalId.value]"
+          },
+          "nameSeed": {
+            "value": "[variables('suffix')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "5909497750695243645"
+            }
+          },
+          "parameters": {
+            "keyVaultResourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the Key Vault that receives the role assignment."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal ID of the Function App managed identity."
+              }
+            },
+            "nameSeed": {
+              "type": "string",
+              "metadata": {
+                "description": "Deterministic suffix used for the role assignment name."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.KeyVault/vaults', last(split(parameters('keyVaultResourceId'), '/')))]",
+              "name": "[guid(resourceId('Microsoft.KeyVault/vaults', last(split(parameters('keyVaultResourceId'), '/'))), parameters('principalId'), parameters('nameSeed'), 'Key Vault Secrets User')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal",
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]"
+              }
+            }
+          ],
+          "outputs": {
+            "roleAssignmentId": {
+              "type": "string",
+              "value": "[extensionResourceId(resourceId('Microsoft.KeyVault/vaults', last(split(parameters('keyVaultResourceId'), '/'))), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.KeyVault/vaults', last(split(parameters('keyVaultResourceId'), '/'))), parameters('principalId'), parameters('nameSeed'), 'Key Vault Secrets User'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "functionApp",
+        "keyVault"
+      ]
+    },
+    "staticWebApp": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "static-web-app",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('staticWebAppLocation')]"
+          },
+          "name": {
+            "value": "[variables('staticWebAppName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "9516311479521978511"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the Static Web App. Use a region supported by Azure Static Web Apps."
+              }
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Static Web App."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to the resource."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Web/staticSites",
+              "apiVersion": "2023-12-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "Standard",
+                "tier": "Standard"
+              },
+              "properties": {}
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "resourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Web/staticSites', parameters('name'))]"
+            },
+            "defaultHostname": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.Web/staticSites', parameters('name')), '2023-12-01').defaultHostname]"
+            }
+          }
+        }
+      }
+    },
+    "communicationServices": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "communication-services",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('acsLocation')]"
+          },
+          "name": {
+            "value": "[variables('communicationServiceName')]"
+          },
+          "dataLocation": {
+            "value": "[parameters('acsDataLocation')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "3804128281438631084"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "defaultValue": "Global",
+              "metadata": {
+                "description": "Azure region for the Communication Services resource metadata. ACS is a global service; use Global unless Azure guidance changes."
+              }
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Azure Communication Services resource."
+              }
+            },
+            "dataLocation": {
+              "type": "string",
+              "metadata": {
+                "description": "Data residency location for Communication Services data, for example United States or Europe."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to the resource."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Communication/communicationServices",
+              "apiVersion": "2023-03-31",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "dataLocation": "[parameters('dataLocation')]"
+              }
+            }
+          ],
+          "outputs": {
+            "name": {
+              "type": "string",
+              "value": "[parameters('name')]"
+            },
+            "resourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Communication/communicationServices', parameters('name'))]"
+            }
+          }
+        }
+      }
+    },
+    "eventGrid": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "event-grid",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "systemTopicName": {
+            "value": "[variables('eventGridSystemTopicName')]"
+          },
+          "sourceResourceId": {
+            "value": "[reference('communicationServices').outputs.resourceId.value]"
+          },
+          "eventSubscriptionName": {
+            "value": "[variables('eventGridSubscriptionName')]"
+          },
+          "destinationType": {
+            "value": "[parameters('eventGridDestinationType')]"
+          },
+          "azureFunctionResourceId": {
+            "value": "[format('{0}/functions/{1}', reference('functionApp').outputs.resourceId.value, parameters('smsHandlerFunctionName'))]"
+          },
+          "webhookEndpointUrl": {
+            "value": "[parameters('eventGridWebhookEndpointUrl')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "2635073376189819711"
+            }
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for the Event Grid system topic."
+              }
+            },
+            "systemTopicName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Event Grid system topic."
+              }
+            },
+            "sourceResourceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource ID of the Azure Communication Services resource that emits SMS events."
+              }
+            },
+            "eventSubscriptionName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Event Grid subscription."
+              }
+            },
+            "destinationType": {
+              "type": "string",
+              "defaultValue": "AzureFunction",
+              "allowedValues": [
+                "AzureFunction",
+                "WebHook"
+              ],
+              "metadata": {
+                "description": "Destination mode. AzureFunction expects azureFunctionResourceId to identify a deployed function endpoint. WebHook expects webhookEndpointUrl."
+              }
+            },
+            "azureFunctionResourceId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Azure Function endpoint resource ID, usually <functionAppResourceId>/functions/<functionName>."
+              }
+            },
+            "webhookEndpointUrl": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Webhook endpoint URL. Do not place secrets in parameter files; pass secure values at deploy time if the URL includes a function key."
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags to apply to resources."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.EventGrid/systemTopics",
+              "apiVersion": "2025-02-15",
+              "name": "[parameters('systemTopicName')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "source": "[parameters('sourceResourceId')]",
+                "topicType": "Microsoft.Communication.CommunicationServices"
+              }
+            },
+            {
+              "condition": "[equals(parameters('destinationType'), 'AzureFunction')]",
+              "type": "Microsoft.EventGrid/systemTopics/eventSubscriptions",
+              "apiVersion": "2025-02-15",
+              "name": "[format('{0}/{1}', parameters('systemTopicName'), parameters('eventSubscriptionName'))]",
+              "properties": {
+                "destination": {
+                  "endpointType": "AzureFunction",
+                  "properties": {
+                    "resourceId": "[parameters('azureFunctionResourceId')]",
+                    "maxEventsPerBatch": 1,
+                    "preferredBatchSizeInKilobytes": 64
+                  }
+                },
+                "filter": {
+                  "includedEventTypes": [
+                    "Microsoft.Communication.SMSReceived"
+                  ]
+                },
+                "eventDeliverySchema": "EventGridSchema",
+                "retryPolicy": {
+                  "maxDeliveryAttempts": 30,
+                  "eventTimeToLiveInMinutes": 1440
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.EventGrid/systemTopics', parameters('systemTopicName'))]"
+              ]
+            },
+            {
+              "condition": "[equals(parameters('destinationType'), 'WebHook')]",
+              "type": "Microsoft.EventGrid/systemTopics/eventSubscriptions",
+              "apiVersion": "2025-02-15",
+              "name": "[format('{0}/{1}', parameters('systemTopicName'), parameters('eventSubscriptionName'))]",
+              "properties": {
+                "destination": {
+                  "endpointType": "WebHook",
+                  "properties": {
+                    "endpointUrl": "[parameters('webhookEndpointUrl')]"
+                  }
+                },
+                "filter": {
+                  "includedEventTypes": [
+                    "Microsoft.Communication.SMSReceived"
+                  ]
+                },
+                "eventDeliverySchema": "EventGridSchema",
+                "retryPolicy": {
+                  "maxDeliveryAttempts": 30,
+                  "eventTimeToLiveInMinutes": 1440
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.EventGrid/systemTopics', parameters('systemTopicName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "systemTopicName": {
+              "type": "string",
+              "value": "[parameters('systemTopicName')]"
+            },
+            "systemTopicResourceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.EventGrid/systemTopics', parameters('systemTopicName'))]"
+            },
+            "eventSubscriptionName": {
+              "type": "string",
+              "value": "[parameters('eventSubscriptionName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "communicationServices",
+        "functionApp"
+      ]
+    }
+  },
+  "outputs": {
+    "staticWebAppName": {
+      "type": "string",
+      "value": "[reference('staticWebApp').outputs.name.value]"
+    },
+    "staticWebAppDefaultHostname": {
+      "type": "string",
+      "value": "[reference('staticWebApp').outputs.defaultHostname.value]"
+    },
+    "functionAppName": {
+      "type": "string",
+      "value": "[reference('functionApp').outputs.name.value]"
+    },
+    "functionAppDefaultHostname": {
+      "type": "string",
+      "value": "[reference('functionApp').outputs.defaultHostname.value]"
+    },
+    "functionAppResourceId": {
+      "type": "string",
+      "value": "[reference('functionApp').outputs.resourceId.value]"
+    },
+    "smsHandlerAzureFunctionResourceId": {
+      "type": "string",
+      "value": "[format('{0}/functions/{1}', reference('functionApp').outputs.resourceId.value, parameters('smsHandlerFunctionName'))]"
+    },
+    "communicationServicesName": {
+      "type": "string",
+      "value": "[reference('communicationServices').outputs.name.value]"
+    },
+    "eventGridSystemTopicName": {
+      "type": "string",
+      "value": "[reference('eventGrid').outputs.systemTopicName.value]"
+    },
+    "eventGridSubscriptionName": {
+      "type": "string",
+      "value": "[reference('eventGrid').outputs.eventSubscriptionName.value]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[reference('storage').outputs.name.value]"
+    },
+    "correlationTableName": {
+      "type": "string",
+      "value": "[parameters('correlationTableName')]"
+    },
+    "keyVaultName": {
+      "type": "string",
+      "value": "[reference('keyVault').outputs.name.value]"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "value": "[reference('monitoring').outputs.workspaceId.value]"
+    },
+    "applicationInsightsId": {
+      "type": "string",
+      "value": "[reference('monitoring').outputs.appInsightsId.value]"
+    }
+  }
+}

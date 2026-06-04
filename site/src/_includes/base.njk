@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }} | USMGA</title>
+  <meta name="description" content="United States Mounted Games Association public website.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Patua+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <nav class="nav-shell" aria-label="Primary navigation">
+      <a class="brand" href="/">
+        <img src="/assets/img/thumbnail-untitled167-20240429205520.jpg" alt="USMGA logo">
+        <span>USMGA</span>
+      </a>
+      <input id="nav-toggle" class="nav-toggle" type="checkbox" aria-label="Toggle navigation">
+      <label class="nav-toggle-label" for="nav-toggle">Menu</label>
+      <ul class="nav-list">
+      {%- for item in navigation %}
+        <li><a href="{{ item.url }}"{% if page.url == item.url %} aria-current="page"{% endif %}>{{ item.title }}</a></li>
+      {%- endfor %}
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero{% if hero %} hero-image{% endif %}"{% if hero %} style="--hero-image: url('{{ hero }}')"{% endif %}>
+      <div class="hero-inner">
+        <p class="eyebrow">United States Mounted Games Association</p>
+        <h1>{{ heading or title }}</h1>
+      </div>
+    </section>
+    <section class="content-shell">
+      {{ content | safe }}
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p><strong>USMGA</strong> · Founded 1986</p>
+    <p><a href="https://www.facebook.com/share/g/1LcYjq6xzp/?mibextid=wwXIfr">Facebook</a> · <a href="https://www.instagram.com/usmga.official?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==">Instagram</a></p>
+  </footer>
+</body>
+</html>
