@@ -155,7 +155,7 @@ module communicationServices 'modules/communication-services.bicep' = {
 module eventGrid 'modules/event-grid.bicep' = {
   name: 'event-grid'
   params: {
-    location: location
+    location: acsLocation
     systemTopicName: eventGridSystemTopicName
     sourceResourceId: communicationServices.outputs.resourceId
     eventSubscriptionName: eventGridSubscriptionName
