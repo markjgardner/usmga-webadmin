@@ -11,6 +11,10 @@ local.settings.json
 node_modules/
 site/_site/
 
+# Publish / deployment artifacts
+publish/
+*.zip
+
 # Logs and OS files
 *.log
 .DS_Store
