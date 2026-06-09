@@ -1,19 +1,13 @@
-using System.Text.Json.Serialization;
-
 namespace Usmga.FunctionApp.Models;
 
+/// <summary>
+/// Represents the relevant fields from a Twilio inbound SMS webhook POST.
+/// Twilio sends form-encoded data; this model is populated after parsing.
+/// </summary>
 public sealed class SmsReceivedPayload
 {
-    [JsonPropertyName("messageId")]
-    public string MessageId { get; set; } = string.Empty;
-    [JsonPropertyName("from")]
+    public string MessageSid { get; set; } = string.Empty;
     public string From { get; set; } = string.Empty;
-    [JsonPropertyName("to")]
     public string To { get; set; } = string.Empty;
-    [JsonPropertyName("message")]
-    public string Message { get; set; } = string.Empty;
-    [JsonPropertyName("receivedTimestamp")]
-    public DateTimeOffset ReceivedTimestamp { get; set; }
-    [JsonPropertyName("segmentCount")]
-    public int SegmentCount { get; set; }
+    public string Body { get; set; } = string.Empty;
 }

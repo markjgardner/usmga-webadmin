@@ -32,7 +32,7 @@ Three independent stacks share this repo:
 
 The function app has two thin entry-point functions that delegate to a service layer:
 
-- **SmsInbound** (Event Grid trigger) — receives ACS `SMSReceived` events, deduplicates on `messageId` (claim/complete/release pattern), classifies the message, and dispatches to `RequestProcessor`.
+- **SmsInbound** (HTTP trigger, `POST /api/sms/inbound`) — receives Twilio inbound SMS webhooks, validates the Twilio request signature, deduplicates on `MessageSid` (claim/complete/release pattern), classifies the message, and dispatches to `RequestProcessor`.
 - **NotifyRequester** (HTTP trigger) — receives GitHub Actions callbacks with preview URLs; validates a shared secret header before sending SMS replies.
 
 Core orchestration lives in `RequestProcessor`, which handles new requests (creates GitHub issues + assigns Copilot), approvals (merges PRs with SHA + status checks guard), and change requests (`@copilot` PR comments).
@@ -44,7 +44,7 @@ Core orchestration lives in `RequestProcessor`, which handles new requests (crea
 | Section | Env var prefix | Source |
 |---------|---------------|--------|
 | `GitHub` | `GitHub__` | Key Vault reference |
-| `Sms` | `Sms__` | Key Vault + app settings |
+| `Twilio` | `Twilio__` | Key Vault (AccountSid, AuthToken) + app settings (FromNumber, Allowlist) |
 | `Storage` | `Storage__` | App setting (connection string + table name) |
 | `Notify` | `Notify__` | Key Vault reference |
 
@@ -76,7 +76,7 @@ All services are registered as singletons. `IGitHubClient` uses `AddHttpClient<>
 
 - Bicep modules under `infra/modules/`; the orchestrator is `infra/main.bicep`.
 - App settings requiring secrets use Key Vault references (`@Microsoft.KeyVault(SecretUri=...)`).
-- The Event Grid system topic location must match the ACS source resource location (currently `Global`).
+- Twilio credentials (Account SID + Auth Token) are stored in Key Vault; phone number and allowlist are plain app settings.
 
 ## CI/CD workflows
 

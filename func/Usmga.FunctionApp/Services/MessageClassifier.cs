@@ -13,7 +13,7 @@ public sealed class MessageClassifier
     private static readonly Regex ChangesPrefixPattern = new(@"^\s*CHANGES\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private readonly HashSet<string> _allowed;
 
-    public MessageClassifier(IOptions<SmsOptions> options)
+    public MessageClassifier(IOptions<TwilioOptions> options)
     {
         _allowed = options.Value.Allowlist.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Select(NormalizePhone)

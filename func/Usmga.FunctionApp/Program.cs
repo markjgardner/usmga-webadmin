@@ -8,13 +8,13 @@ var host = new HostBuilder()
     .ConfigureServices((context, services) =>
     {
         services.Configure<GitHubOptions>(context.Configuration.GetSection("GitHub"));
-        services.Configure<SmsOptions>(context.Configuration.GetSection("Sms"));
+        services.Configure<TwilioOptions>(context.Configuration.GetSection("Twilio"));
         services.Configure<StorageOptions>(context.Configuration.GetSection("Storage"));
         services.Configure<NotifyOptions>(context.Configuration.GetSection("Notify"));
         services.AddSingleton<ITokenGenerator, SecureTokenGenerator>();
         services.AddSingleton<MessageClassifier>();
         services.AddSingleton<IStateStore, TableStateStore>();
-        services.AddSingleton<ISmsClient, AcsSmsClient>();
+        services.AddSingleton<ISmsClient, TwilioSmsClient>();
         services.AddHttpClient<IGitHubClient, GitHubClient>();
         services.AddSingleton<RequestProcessor>();
     })

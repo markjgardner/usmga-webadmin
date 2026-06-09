@@ -14,17 +14,17 @@ public sealed class RequestProcessor
     private readonly IStateStore _state;
     private readonly ITokenGenerator _tokens;
     private readonly MessageClassifier _classifier;
-    private readonly SmsOptions _smsOptions;
+    private readonly TwilioOptions _twilioOptions;
     private readonly ILogger<RequestProcessor> _logger;
 
-    public RequestProcessor(IGitHubClient gitHub, ISmsClient sms, IStateStore state, ITokenGenerator tokens, MessageClassifier classifier, IOptions<SmsOptions> smsOptions, ILogger<RequestProcessor> logger)
+    public RequestProcessor(IGitHubClient gitHub, ISmsClient sms, IStateStore state, ITokenGenerator tokens, MessageClassifier classifier, IOptions<TwilioOptions> twilioOptions, ILogger<RequestProcessor> logger)
     {
         _gitHub = gitHub;
         _sms = sms;
         _state = state;
         _tokens = tokens;
         _classifier = classifier;
-        _smsOptions = smsOptions.Value;
+        _twilioOptions = twilioOptions.Value;
         _logger = logger;
     }
 
@@ -211,13 +211,13 @@ public sealed class RequestProcessor
 
     private async Task<string?> MaybeCreateUploadLinkAsync(string code, string from, string text, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_smsOptions.UploadBaseUrl) || !_classifier.SuggestsAttachment(text))
+        if (string.IsNullOrWhiteSpace(_twilioOptions.UploadBaseUrl) || !_classifier.SuggestsAttachment(text))
         {
             return null;
         }
 
         var token = await _state.CreateUploadTokenAsync(code, from, cancellationToken);
-        return $"{_smsOptions.UploadBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(token)}";
+        return $"{_twilioOptions.UploadBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(token)}";
     }
 
     private static string BuildIssueTitle(string code, string nonce) => $"[USMGA-SMS {code}] Website change request {nonce}";

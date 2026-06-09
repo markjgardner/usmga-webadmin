@@ -13,40 +13,23 @@ param environmentName string = 'test'
 @maxLength(12)
 param namePrefix string = 'usmga'
 
-@description('Data residency location for Azure Communication Services data, for example United States or Europe.')
-param acsDataLocation string = 'United States'
-
-@description('Azure region for Azure Communication Services resource metadata. ACS is commonly deployed as Global.')
-param acsLocation string = 'Global'
-
 @description('Azure Static Web Apps region. Choose a region supported by Static Web Apps.')
 param staticWebAppLocation string = 'eastus2'
-
-@description('Name of the Function in the Function App that receives Event Grid SMS events. Must match the [Function(...)] name in the function code. Deploy function code before creating or validating the Event Grid AzureFunction destination.')
-param smsHandlerFunctionName string = 'SmsInbound'
-
-@description('Event Grid destination mode. Use AzureFunction after function code exists; use WebHook when passing a secured endpoint URL at deployment time.')
-@allowed([
-  'AzureFunction'
-  'WebHook'
-])
-param eventGridDestinationType string = 'AzureFunction'
-
-@description('Webhook endpoint URL for Event Grid when eventGridDestinationType is WebHook. Do not store secret-bearing URLs in parameter files.')
-@secure()
-param eventGridWebhookEndpointUrl string = ''
 
 @description('Name of the Key Vault secret that operators will create for the GitHub PAT or GitHub App credential.')
 param githubCredentialSecretName string = 'github-credential'
 
-@description('Name of the Key Vault secret that operators will create for the ACS connection string.')
-param acsConnectionStringSecretName string = 'acs-connection-string'
+@description('Name of the Key Vault secret that operators will create for the Twilio Account SID.')
+param twilioAccountSidSecretName string = 'twilio-account-sid'
+
+@description('Name of the Key Vault secret that operators will create for the Twilio Auth Token.')
+param twilioAuthTokenSecretName string = 'twilio-auth-token'
 
 @description('Name of the Key Vault secret that operators will create for the shared secret used to authenticate the workflow -> NotifyRequester callback. Must match the NOTIFY_SHARED_SECRET GitHub Actions secret.')
 param notifySharedSecretName string = 'notify-shared-secret'
 
-@description('ACS-provisioned phone number used as the SMS From address, in E.164 format (for example +15551234567).')
-param smsFromNumber string = ''
+@description('Twilio phone number used as the SMS From address, in E.164 format (for example +15551234567).')
+param twilioFromNumber string = ''
 
 @description('Comma-separated allowlist of E.164 phone numbers permitted to submit change requests.')
 param smsAllowlist string = ''
@@ -66,9 +49,6 @@ var normalizedEnvironment = toLower(replace(environmentName, '-', ''))
 var baseName = toLower('${namePrefix}-${environmentName}-${suffix}')
 
 var staticWebAppName = '${baseName}-swa'
-var communicationServiceName = '${baseName}-acs'
-var eventGridSystemTopicName = '${baseName}-acs-egst'
-var eventGridSubscriptionName = 'sms-received-to-function'
 var storageAccountName = '${take('${normalizedPrefix}${normalizedEnvironment}', 9)}st${suffix}'
 var workspaceName = '${baseName}-law'
 var appInsightsName = '${baseName}-appi'
@@ -115,9 +95,10 @@ module functionApp 'modules/function-app.bicep' = {
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     keyVaultUri: keyVault.outputs.vaultUri
     githubCredentialSecretName: githubCredentialSecretName
-    acsConnectionStringSecretName: acsConnectionStringSecretName
+    twilioAccountSidSecretName: twilioAccountSidSecretName
+    twilioAuthTokenSecretName: twilioAuthTokenSecretName
     notifySharedSecretName: notifySharedSecretName
-    smsFromNumber: smsFromNumber
+    twilioFromNumber: twilioFromNumber
     smsAllowlist: smsAllowlist
     correlationTableName: correlationTableName
     tags: tags
@@ -142,41 +123,14 @@ module staticWebApp 'modules/static-web-app.bicep' = {
   }
 }
 
-module communicationServices 'modules/communication-services.bicep' = {
-  name: 'communication-services'
-  params: {
-    location: acsLocation
-    name: communicationServiceName
-    dataLocation: acsDataLocation
-    tags: tags
-  }
-}
-
-module eventGrid 'modules/event-grid.bicep' = {
-  name: 'event-grid'
-  params: {
-    location: acsLocation
-    systemTopicName: eventGridSystemTopicName
-    sourceResourceId: communicationServices.outputs.resourceId
-    eventSubscriptionName: eventGridSubscriptionName
-    destinationType: eventGridDestinationType
-    azureFunctionResourceId: '${functionApp.outputs.resourceId}/functions/${smsHandlerFunctionName}'
-    webhookEndpointUrl: eventGridWebhookEndpointUrl
-    tags: tags
-  }
-}
-
 output staticWebAppName string = staticWebApp.outputs.name
 output staticWebAppDefaultHostname string = staticWebApp.outputs.defaultHostname
 output functionAppName string = functionApp.outputs.name
 output functionAppDefaultHostname string = functionApp.outputs.defaultHostname
 output functionAppResourceId string = functionApp.outputs.resourceId
-output smsHandlerAzureFunctionResourceId string = '${functionApp.outputs.resourceId}/functions/${smsHandlerFunctionName}'
-output communicationServicesName string = communicationServices.outputs.name
-output eventGridSystemTopicName string = eventGrid.outputs.systemTopicName
-output eventGridSubscriptionName string = eventGrid.outputs.eventSubscriptionName
 output storageAccountName string = storage.outputs.name
 output correlationTableName string = correlationTableName
 output keyVaultName string = keyVault.outputs.name
 output logAnalyticsWorkspaceId string = monitoring.outputs.workspaceId
 output applicationInsightsId string = monitoring.outputs.appInsightsId
+

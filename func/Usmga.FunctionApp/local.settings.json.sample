@@ -11,11 +11,11 @@
     "GitHub:ApiBaseUrl": "https://api.github.com",
     "GitHub:CopilotLogin": "copilot-swe-agent",
     "GitHub:CopilotAssignee": "copilot-swe-agent[bot]",
-    "Sms:FromNumber": "+15551234567",
-    "Sms:Endpoint": "https://YOUR-ACS.communication.azure.com",
-    "Sms:ConnectionString": "",
-    "Sms:Allowlist": "+15550000001,+15550000002",
-    "Sms:UploadBaseUrl": "https://example.com/upload",
+    "Twilio:AccountSid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "Twilio:AuthToken": "your-twilio-auth-token",
+    "Twilio:FromNumber": "+15551234567",
+    "Twilio:Allowlist": "+15550000001,+15550000002",
+    "Twilio:UploadBaseUrl": "https://example.com/upload",
     "Notify:SharedSecret": "local-dev-secret",
     "Notify:HeaderName": "x-usmga-notify-secret"
   }

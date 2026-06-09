@@ -107,8 +107,8 @@ public sealed class ApproveGuardTests
 
     private static RequestProcessor NewProcessor(IGitHubClient github, ISmsClient sms, IStateStore state)
     {
-        var smsOptions = Microsoft.Extensions.Options.Options.Create(new SmsOptions { Allowlist = "+15550000001" });
-        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(smsOptions), smsOptions, NullLogger<RequestProcessor>.Instance);
+        var twilioOptions = Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001" });
+        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(twilioOptions), twilioOptions, NullLogger<RequestProcessor>.Instance);
     }
 
     private sealed class FakeTokens : ITokenGenerator

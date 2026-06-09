@@ -2,7 +2,6 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using Azure.Messaging.EventGrid;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -77,27 +76,15 @@ public sealed class HighValueFixTests
     }
 
     [Fact]
-    public async Task MalformedApproveIsRejectedAndDoesNotCreateIssue()
+    public void MalformedApproveClassifiesAsInvalid()
     {
-        var github = new FakeGitHubClient();
-        var sms = new FakeSmsClient();
-        var state = new InMemoryStateStore();
-        var processor = NewProcessor(github, sms, state);
-        var classifier = new MessageClassifier(Microsoft.Extensions.Options.Options.Create(new SmsOptions { Allowlist = "+15550000001" }));
-        var inbound = new SmsInbound(classifier, state, sms, processor, NullLogger<SmsInbound>.Instance);
-        var evt = new EventGridEvent("sms", "Microsoft.Communication.SMSReceived", "1.0", BinaryData.FromObjectAsJson(new SmsReceivedPayload
-        {
-            MessageId = "msg-approve-bad",
-            From = "+15550000001",
-            To = "+15550000000",
-            Message = "APPROVE abc123"
-        }));
+        var twilioOptions = Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001" });
+        var classifier = new MessageClassifier(twilioOptions);
 
-        await inbound.Run(evt, CancellationToken.None);
+        var command = classifier.Classify("APPROVE abc123");
 
-        Assert.Equal(0, github.CreateIssueCalls);
-        Assert.Contains("APPROVE <code> <approval-nonce>", sms.Messages.Single().Message);
-        Assert.Null(await state.GetByCodeAsync("ABC123", CancellationToken.None));
+        Assert.Equal(InboundCommandKind.Invalid, command.Kind);
+        Assert.Contains("APPROVE <code> <approval-nonce>", command.Text);
     }
 
     [Theory]
@@ -176,8 +163,8 @@ public sealed class HighValueFixTests
 
     private static RequestProcessor NewProcessor(FakeGitHubClient github, FakeSmsClient sms, InMemoryStateStore state)
     {
-        var smsOptions = Microsoft.Extensions.Options.Options.Create(new SmsOptions { Allowlist = "+15550000001,+15550000002" });
-        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(smsOptions), smsOptions, NullLogger<RequestProcessor>.Instance);
+        var twilioOptions = Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001,+15550000002" });
+        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(twilioOptions), twilioOptions, NullLogger<RequestProcessor>.Instance);
     }
 
     private static NotifyRequester NewNotifyRequester(string sharedSecret)

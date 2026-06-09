@@ -7,7 +7,7 @@ namespace Usmga.FunctionApp.Tests;
 
 public sealed class ClassifierTests
 {
-    private static MessageClassifier Classifier() => new(Microsoft.Extensions.Options.Options.Create(new SmsOptions { Allowlist = "+15550000001,+15550000002" }));
+    private static MessageClassifier Classifier() => new(Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001,+15550000002" }));
 
     [Fact]
     public void ParsesApproveWithCodeAndNonce()

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "4280205488527491824"
+      "templateHash": "16947564689900232551"
     }
   },
   "parameters": {
@@ -35,50 +35,11 @@
         "description": "Short resource name prefix. Use lowercase letters/numbers/hyphens where supported."
       }
     },
-    "acsDataLocation": {
-      "type": "string",
-      "defaultValue": "United States",
-      "metadata": {
-        "description": "Data residency location for Azure Communication Services data, for example United States or Europe."
-      }
-    },
-    "acsLocation": {
-      "type": "string",
-      "defaultValue": "Global",
-      "metadata": {
-        "description": "Azure region for Azure Communication Services resource metadata. ACS is commonly deployed as Global."
-      }
-    },
     "staticWebAppLocation": {
       "type": "string",
       "defaultValue": "eastus2",
       "metadata": {
         "description": "Azure Static Web Apps region. Choose a region supported by Static Web Apps."
-      }
-    },
-    "smsHandlerFunctionName": {
-      "type": "string",
-      "defaultValue": "SmsInbound",
-      "metadata": {
-        "description": "Name of the Function in the Function App that receives Event Grid SMS events. Must match the [Function(...)] name in the function code. Deploy function code before creating or validating the Event Grid AzureFunction destination."
-      }
-    },
-    "eventGridDestinationType": {
-      "type": "string",
-      "defaultValue": "AzureFunction",
-      "allowedValues": [
-        "AzureFunction",
-        "WebHook"
-      ],
-      "metadata": {
-        "description": "Event Grid destination mode. Use AzureFunction after function code exists; use WebHook when passing a secured endpoint URL at deployment time."
-      }
-    },
-    "eventGridWebhookEndpointUrl": {
-      "type": "securestring",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Webhook endpoint URL for Event Grid when eventGridDestinationType is WebHook. Do not store secret-bearing URLs in parameter files."
       }
     },
     "githubCredentialSecretName": {
@@ -88,11 +49,18 @@
         "description": "Name of the Key Vault secret that operators will create for the GitHub PAT or GitHub App credential."
       }
     },
-    "acsConnectionStringSecretName": {
+    "twilioAccountSidSecretName": {
       "type": "string",
-      "defaultValue": "acs-connection-string",
+      "defaultValue": "twilio-account-sid",
       "metadata": {
-        "description": "Name of the Key Vault secret that operators will create for the ACS connection string."
+        "description": "Name of the Key Vault secret that operators will create for the Twilio Account SID."
+      }
+    },
+    "twilioAuthTokenSecretName": {
+      "type": "string",
+      "defaultValue": "twilio-auth-token",
+      "metadata": {
+        "description": "Name of the Key Vault secret that operators will create for the Twilio Auth Token."
       }
     },
     "notifySharedSecretName": {
@@ -102,11 +70,11 @@
         "description": "Name of the Key Vault secret that operators will create for the shared secret used to authenticate the workflow -> NotifyRequester callback. Must match the NOTIFY_SHARED_SECRET GitHub Actions secret."
       }
     },
-    "smsFromNumber": {
+    "twilioFromNumber": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "ACS-provisioned phone number used as the SMS From address, in E.164 format (for example +15551234567)."
+        "description": "Twilio phone number used as the SMS From address, in E.164 format (for example +15551234567)."
       }
     },
     "smsAllowlist": {
@@ -140,9 +108,6 @@
     "normalizedEnvironment": "[toLower(replace(parameters('environmentName'), '-', ''))]",
     "baseName": "[toLower(format('{0}-{1}-{2}', parameters('namePrefix'), parameters('environmentName'), variables('suffix')))]",
     "staticWebAppName": "[format('{0}-swa', variables('baseName'))]",
-    "communicationServiceName": "[format('{0}-acs', variables('baseName'))]",
-    "eventGridSystemTopicName": "[format('{0}-acs-egst', variables('baseName'))]",
-    "eventGridSubscriptionName": "sms-received-to-function",
     "storageAccountName": "[format('{0}st{1}', take(format('{0}{1}', variables('normalizedPrefix'), variables('normalizedEnvironment')), 9), variables('suffix'))]",
     "workspaceName": "[format('{0}-law', variables('baseName'))]",
     "appInsightsName": "[format('{0}-appi', variables('baseName'))]",
@@ -514,14 +479,17 @@
           "githubCredentialSecretName": {
             "value": "[parameters('githubCredentialSecretName')]"
           },
-          "acsConnectionStringSecretName": {
-            "value": "[parameters('acsConnectionStringSecretName')]"
+          "twilioAccountSidSecretName": {
+            "value": "[parameters('twilioAccountSidSecretName')]"
+          },
+          "twilioAuthTokenSecretName": {
+            "value": "[parameters('twilioAuthTokenSecretName')]"
           },
           "notifySharedSecretName": {
             "value": "[parameters('notifySharedSecretName')]"
           },
-          "smsFromNumber": {
-            "value": "[parameters('smsFromNumber')]"
+          "twilioFromNumber": {
+            "value": "[parameters('twilioFromNumber')]"
           },
           "smsAllowlist": {
             "value": "[parameters('smsAllowlist')]"
@@ -540,7 +508,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "9739020039536108772"
+              "templateHash": "8645900534857896631"
             }
           },
           "parameters": {
@@ -586,10 +554,16 @@
                 "description": "Name of the Key Vault secret that will contain the GitHub token or app credential."
               }
             },
-            "acsConnectionStringSecretName": {
+            "twilioAccountSidSecretName": {
               "type": "string",
               "metadata": {
-                "description": "Name of the Key Vault secret that will contain the Azure Communication Services connection string."
+                "description": "Name of the Key Vault secret that will contain the Twilio Account SID."
+              }
+            },
+            "twilioAuthTokenSecretName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Key Vault secret that will contain the Twilio Auth Token."
               }
             },
             "notifySharedSecretName": {
@@ -598,11 +572,11 @@
                 "description": "Name of the Key Vault secret that will contain the shared secret used to authenticate the workflow -> NotifyRequester callback."
               }
             },
-            "smsFromNumber": {
+            "twilioFromNumber": {
               "type": "string",
               "defaultValue": "",
               "metadata": {
-                "description": "ACS-provisioned phone number used as the SMS From address, in E.164 format."
+                "description": "Twilio phone number used as the SMS From address, in E.164 format."
               }
             },
             "smsAllowlist": {
@@ -694,15 +668,19 @@
                       "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('githubCredentialSecretName'))]"
                     },
                     {
-                      "name": "Sms__ConnectionString",
-                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('acsConnectionStringSecretName'))]"
+                      "name": "Twilio__AccountSid",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('twilioAccountSidSecretName'))]"
                     },
                     {
-                      "name": "Sms__FromNumber",
-                      "value": "[parameters('smsFromNumber')]"
+                      "name": "Twilio__AuthToken",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('twilioAuthTokenSecretName'))]"
                     },
                     {
-                      "name": "Sms__Allowlist",
+                      "name": "Twilio__FromNumber",
+                      "value": "[parameters('twilioFromNumber')]"
+                    },
+                    {
+                      "name": "Twilio__Allowlist",
                       "value": "[parameters('smsAllowlist')]"
                     },
                     {
@@ -900,285 +878,6 @@
           }
         }
       }
-    },
-    "communicationServices": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "communication-services",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "location": {
-            "value": "[parameters('acsLocation')]"
-          },
-          "name": {
-            "value": "[variables('communicationServiceName')]"
-          },
-          "dataLocation": {
-            "value": "[parameters('acsDataLocation')]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "3804128281438631084"
-            }
-          },
-          "parameters": {
-            "location": {
-              "type": "string",
-              "defaultValue": "Global",
-              "metadata": {
-                "description": "Azure region for the Communication Services resource metadata. ACS is a global service; use Global unless Azure guidance changes."
-              }
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "Name of the Azure Communication Services resource."
-              }
-            },
-            "dataLocation": {
-              "type": "string",
-              "metadata": {
-                "description": "Data residency location for Communication Services data, for example United States or Europe."
-              }
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Tags to apply to the resource."
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Communication/communicationServices",
-              "apiVersion": "2023-03-31",
-              "name": "[parameters('name')]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "dataLocation": "[parameters('dataLocation')]"
-              }
-            }
-          ],
-          "outputs": {
-            "name": {
-              "type": "string",
-              "value": "[parameters('name')]"
-            },
-            "resourceId": {
-              "type": "string",
-              "value": "[resourceId('Microsoft.Communication/communicationServices', parameters('name'))]"
-            }
-          }
-        }
-      }
-    },
-    "eventGrid": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "event-grid",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "systemTopicName": {
-            "value": "[variables('eventGridSystemTopicName')]"
-          },
-          "sourceResourceId": {
-            "value": "[reference('communicationServices').outputs.resourceId.value]"
-          },
-          "eventSubscriptionName": {
-            "value": "[variables('eventGridSubscriptionName')]"
-          },
-          "destinationType": {
-            "value": "[parameters('eventGridDestinationType')]"
-          },
-          "azureFunctionResourceId": {
-            "value": "[format('{0}/functions/{1}', reference('functionApp').outputs.resourceId.value, parameters('smsHandlerFunctionName'))]"
-          },
-          "webhookEndpointUrl": {
-            "value": "[parameters('eventGridWebhookEndpointUrl')]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "2635073376189819711"
-            }
-          },
-          "parameters": {
-            "location": {
-              "type": "string",
-              "metadata": {
-                "description": "Azure region for the Event Grid system topic."
-              }
-            },
-            "systemTopicName": {
-              "type": "string",
-              "metadata": {
-                "description": "Name of the Event Grid system topic."
-              }
-            },
-            "sourceResourceId": {
-              "type": "string",
-              "metadata": {
-                "description": "Resource ID of the Azure Communication Services resource that emits SMS events."
-              }
-            },
-            "eventSubscriptionName": {
-              "type": "string",
-              "metadata": {
-                "description": "Name of the Event Grid subscription."
-              }
-            },
-            "destinationType": {
-              "type": "string",
-              "defaultValue": "AzureFunction",
-              "allowedValues": [
-                "AzureFunction",
-                "WebHook"
-              ],
-              "metadata": {
-                "description": "Destination mode. AzureFunction expects azureFunctionResourceId to identify a deployed function endpoint. WebHook expects webhookEndpointUrl."
-              }
-            },
-            "azureFunctionResourceId": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Azure Function endpoint resource ID, usually <functionAppResourceId>/functions/<functionName>."
-              }
-            },
-            "webhookEndpointUrl": {
-              "type": "securestring",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Webhook endpoint URL. Do not place secrets in parameter files; pass secure values at deploy time if the URL includes a function key."
-              }
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Tags to apply to resources."
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.EventGrid/systemTopics",
-              "apiVersion": "2025-02-15",
-              "name": "[parameters('systemTopicName')]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "source": "[parameters('sourceResourceId')]",
-                "topicType": "Microsoft.Communication.CommunicationServices"
-              }
-            },
-            {
-              "condition": "[equals(parameters('destinationType'), 'AzureFunction')]",
-              "type": "Microsoft.EventGrid/systemTopics/eventSubscriptions",
-              "apiVersion": "2025-02-15",
-              "name": "[format('{0}/{1}', parameters('systemTopicName'), parameters('eventSubscriptionName'))]",
-              "properties": {
-                "destination": {
-                  "endpointType": "AzureFunction",
-                  "properties": {
-                    "resourceId": "[parameters('azureFunctionResourceId')]",
-                    "maxEventsPerBatch": 1,
-                    "preferredBatchSizeInKilobytes": 64
-                  }
-                },
-                "filter": {
-                  "includedEventTypes": [
-                    "Microsoft.Communication.SMSReceived"
-                  ]
-                },
-                "eventDeliverySchema": "EventGridSchema",
-                "retryPolicy": {
-                  "maxDeliveryAttempts": 30,
-                  "eventTimeToLiveInMinutes": 1440
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.EventGrid/systemTopics', parameters('systemTopicName'))]"
-              ]
-            },
-            {
-              "condition": "[equals(parameters('destinationType'), 'WebHook')]",
-              "type": "Microsoft.EventGrid/systemTopics/eventSubscriptions",
-              "apiVersion": "2025-02-15",
-              "name": "[format('{0}/{1}', parameters('systemTopicName'), parameters('eventSubscriptionName'))]",
-              "properties": {
-                "destination": {
-                  "endpointType": "WebHook",
-                  "properties": {
-                    "endpointUrl": "[parameters('webhookEndpointUrl')]"
-                  }
-                },
-                "filter": {
-                  "includedEventTypes": [
-                    "Microsoft.Communication.SMSReceived"
-                  ]
-                },
-                "eventDeliverySchema": "EventGridSchema",
-                "retryPolicy": {
-                  "maxDeliveryAttempts": 30,
-                  "eventTimeToLiveInMinutes": 1440
-                }
-              },
-              "dependsOn": [
-                "[resourceId('Microsoft.EventGrid/systemTopics', parameters('systemTopicName'))]"
-              ]
-            }
-          ],
-          "outputs": {
-            "systemTopicName": {
-              "type": "string",
-              "value": "[parameters('systemTopicName')]"
-            },
-            "systemTopicResourceId": {
-              "type": "string",
-              "value": "[resourceId('Microsoft.EventGrid/systemTopics', parameters('systemTopicName'))]"
-            },
-            "eventSubscriptionName": {
-              "type": "string",
-              "value": "[parameters('eventSubscriptionName')]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "communicationServices",
-        "functionApp"
-      ]
     }
   },
   "outputs": {
@@ -1201,22 +900,6 @@
     "functionAppResourceId": {
       "type": "string",
       "value": "[reference('functionApp').outputs.resourceId.value]"
-    },
-    "smsHandlerAzureFunctionResourceId": {
-      "type": "string",
-      "value": "[format('{0}/functions/{1}', reference('functionApp').outputs.resourceId.value, parameters('smsHandlerFunctionName'))]"
-    },
-    "communicationServicesName": {
-      "type": "string",
-      "value": "[reference('communicationServices').outputs.name.value]"
-    },
-    "eventGridSystemTopicName": {
-      "type": "string",
-      "value": "[reference('eventGrid').outputs.systemTopicName.value]"
-    },
-    "eventGridSubscriptionName": {
-      "type": "string",
-      "value": "[reference('eventGrid').outputs.eventSubscriptionName.value]"
     },
     "storageAccountName": {
       "type": "string",

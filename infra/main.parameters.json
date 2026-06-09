@@ -11,26 +11,17 @@
     "namePrefix": {
       "value": "usmga"
     },
-    "acsDataLocation": {
-      "value": "United States"
-    },
-    "acsLocation": {
-      "value": "Global"
-    },
     "staticWebAppLocation": {
       "value": "eastus2"
-    },
-    "smsHandlerFunctionName": {
-      "value": "SmsInbound"
-    },
-    "eventGridDestinationType": {
-      "value": "AzureFunction"
     },
     "githubCredentialSecretName": {
       "value": "github-credential"
     },
-    "acsConnectionStringSecretName": {
-      "value": "acs-connection-string"
+    "twilioAccountSidSecretName": {
+      "value": "twilio-account-sid"
+    },
+    "twilioAuthTokenSecretName": {
+      "value": "twilio-auth-token"
     },
     "correlationTableName": {
       "value": "SmsCorrelation"

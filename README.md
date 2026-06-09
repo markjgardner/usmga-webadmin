@@ -9,7 +9,7 @@ knowledge required for the requester.
 ## How it works
 
 ```
-Board member ──SMS──▶ ACS number ──Event Grid──▶ Azure Function (SmsInbound)
+Board member ──SMS──▶ Twilio number ──webhook──▶ Azure Function (SmsInbound)
    │                                                    │
    │                                                    ├─ creates a GitHub issue + assigns Copilot
    │                                                    │
@@ -36,15 +36,15 @@ Board member ──SMS──▶ ACS number ──Event Grid──▶ Azure Funct
 | Path | Description |
 | --- | --- |
 | [`site/`](site/) | The public website, an [Eleventy](https://www.11ty.dev/) static site. Builds to `site/_site`. Hosted on Azure Static Web Apps. |
-| [`func/`](func/) | Azure Functions app (C# .NET 8 isolated): `SmsInbound` (Event Grid) and `NotifyRequester` (secured HTTP). |
-| [`infra/`](infra/) | Azure Bicep IaC for all resources (Static Web App, Communication Services, Event Grid, Function App, Storage, Key Vault, monitoring). |
+| [`func/`](func/) | Azure Functions app (C# .NET 8 isolated): `SmsInbound` (Twilio webhook HTTP trigger) and `NotifyRequester` (secured HTTP). |
+| [`infra/`](infra/) | Azure Bicep IaC for all resources (Static Web App, Function App, Storage, Key Vault, monitoring). |
 | [`.github/workflows/`](.github/workflows/) | CI + deployment workflows (preview, production, function deploy). |
 | [`.github/docs/copilot-assignment.md`](.github/docs/copilot-assignment.md) | How issues are dispatched to / linked back from the Copilot coding agent. |
 | [`scripts/`](scripts/) | Operational scripts (e.g. branch-protection setup). |
 
 ## Architecture decisions
 
-- **SMS:** Azure Communication Services (ACS). Inbound arrives via Event Grid (`Microsoft.Communication.SMSReceived`); outbound via the ACS SMS SDK. **ACS has no MMS** — attachments are handled by replying with an upload link, not by receiving media.
+- **SMS:** Twilio. Inbound arrives via Twilio webhook POST to an HTTP-triggered function; outbound via the Twilio REST API. Twilio request signature validation prevents spoofing. **Twilio supports MMS** but this project currently only uses plain-text SMS; attachments are handled by replying with an upload link.
 - **Hosting:** Azure Static Web Apps (Standard) — native per-PR **preview environments** plus production.
 - **IaC:** Bicep.
 - **Function runtime:** C# .NET 8 isolated, Azure Functions v4.
@@ -55,7 +55,8 @@ Board member ──SMS──▶ ACS number ──Event Grid──▶ Azure Funct
 - Inbound texts are restricted to an **allowlist** of board phone numbers (normalized to E.164).
 - Approvals require an **unguessable, expiring nonce** bound to the requester's phone and the reviewed commit SHA — not just a short code.
 - Merge happens only if the PR head SHA still equals the reviewed SHA **and** required GitHub Actions check-runs + commit statuses pass; the merge call pins the expected `sha` for atomicity.
-- Event Grid is at-least-once; the function **deduplicates on `messageId`** (claim-then-finalize so transient failures can be retried).
+- Twilio webhooks are validated with `RequestValidator` using the Twilio Auth Token; additionally the Function uses `AuthorizationLevel.Function` for defense-in-depth.
+- The function **deduplicates on `MessageSid`** (claim-then-finalize so transient failures can be retried).
 - `NotifyRequester` requires both a Functions key and a shared-secret header.
 - **Branch protection** on `main` (see `scripts/setup-branch-protection.sh`) is the backstop that prevents merging unbuilt/failing code.
 
@@ -87,8 +88,8 @@ az deployment group create -g <rg> -f infra/main.bicep -p infra/main.parameters.
 
 Then complete the **manual steps** documented in [`infra/README.md`](infra/README.md):
 
-1. Purchase an SMS-capable ACS phone number and complete toll-free / 10DLC verification (not automatable).
-2. Store the ACS connection string and the GitHub bot PAT as Key Vault secrets.
+1. Purchase a Twilio phone number and configure its SMS webhook URL to point at the Function App's `/api/sms/inbound` endpoint.
+2. Store the Twilio Account SID, Auth Token, and the GitHub bot PAT as Key Vault secrets.
 3. Link the Static Web App to this GitHub repository and capture its deployment token.
 
 ### 2. Configure GitHub secrets

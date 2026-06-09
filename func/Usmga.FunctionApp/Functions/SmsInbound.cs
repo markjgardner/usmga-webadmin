@@ -1,7 +1,12 @@
-using Azure.Messaging.EventGrid;
+using System.Net;
+using System.Web;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Twilio.Security;
 using Usmga.FunctionApp.Models;
+using Usmga.FunctionApp.Options;
 using Usmga.FunctionApp.Services;
 
 namespace Usmga.FunctionApp.Functions;
@@ -12,37 +17,64 @@ public sealed class SmsInbound
     private readonly IStateStore _state;
     private readonly ISmsClient _sms;
     private readonly RequestProcessor _processor;
+    private readonly TwilioOptions _twilioOptions;
     private readonly ILogger<SmsInbound> _logger;
 
-    public SmsInbound(MessageClassifier classifier, IStateStore state, ISmsClient sms, RequestProcessor processor, ILogger<SmsInbound> logger)
+    public SmsInbound(MessageClassifier classifier, IStateStore state, ISmsClient sms, RequestProcessor processor, IOptions<TwilioOptions> twilioOptions, ILogger<SmsInbound> logger)
     {
         _classifier = classifier;
         _state = state;
         _sms = sms;
         _processor = processor;
+        _twilioOptions = twilioOptions.Value;
         _logger = logger;
     }
 
     [Function("SmsInbound")]
-    public async Task Run([EventGridTrigger] EventGridEvent eventGridEvent, CancellationToken cancellationToken)
+    public async Task<HttpResponseData> Run(
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "sms/inbound")] HttpRequestData req,
+        CancellationToken cancellationToken)
     {
-        if (!StringComparer.OrdinalIgnoreCase.Equals(eventGridEvent.EventType, "Microsoft.Communication.SMSReceived"))
+        var body = await req.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(body))
         {
-            _logger.LogInformation("Ignoring Event Grid event type {EventType}", eventGridEvent.EventType);
-            return;
+            _logger.LogWarning("Empty request body");
+            return req.CreateResponse(HttpStatusCode.BadRequest);
         }
 
-        var sms = eventGridEvent.Data.ToObjectFromJson<SmsReceivedPayload>();
-        if (sms is null || string.IsNullOrWhiteSpace(sms.MessageId))
+        // Validate Twilio request signature
+        var signature = req.Headers.TryGetValues("X-Twilio-Signature", out var sigValues)
+            ? sigValues.FirstOrDefault() ?? string.Empty
+            : string.Empty;
+
+        var formParams = ParseFormBody(body);
+        var validator = new RequestValidator(_twilioOptions.AuthToken);
+        var requestUrl = req.Url.ToString();
+
+        if (!validator.Validate(requestUrl, formParams, signature))
         {
-            _logger.LogWarning("Ignoring malformed SMS event");
-            return;
+            _logger.LogWarning("Twilio signature validation failed");
+            return req.CreateResponse(HttpStatusCode.Forbidden);
         }
 
-        if (!await _state.TryClaimMessageAsync(sms.MessageId, cancellationToken))
+        var sms = new SmsReceivedPayload
         {
-            _logger.LogInformation("Ignoring duplicate or in-flight SMS message {MessageId}", sms.MessageId);
-            return;
+            MessageSid = formParams.GetValueOrDefault("MessageSid", string.Empty),
+            From = formParams.GetValueOrDefault("From", string.Empty),
+            To = formParams.GetValueOrDefault("To", string.Empty),
+            Body = formParams.GetValueOrDefault("Body", string.Empty),
+        };
+
+        if (string.IsNullOrWhiteSpace(sms.MessageSid))
+        {
+            _logger.LogWarning("Ignoring malformed Twilio webhook (missing MessageSid)");
+            return req.CreateResponse(HttpStatusCode.BadRequest);
+        }
+
+        if (!await _state.TryClaimMessageAsync(sms.MessageSid, cancellationToken))
+        {
+            _logger.LogInformation("Ignoring duplicate or in-flight SMS message {MessageSid}", sms.MessageSid);
+            return req.CreateResponse(HttpStatusCode.OK);
         }
 
         try
@@ -50,11 +82,11 @@ public sealed class SmsInbound
             if (!_classifier.IsAllowed(sms.From))
             {
                 await _sms.SendAsync(sms.From, "This USMGA website SMS number only accepts requests from authorized board members.", cancellationToken);
-                await _state.CompleteMessageAsync(sms.MessageId, cancellationToken);
-                return;
+                await _state.CompleteMessageAsync(sms.MessageSid, cancellationToken);
+                return req.CreateResponse(HttpStatusCode.OK);
             }
 
-            var command = _classifier.Classify(sms.Message);
+            var command = _classifier.Classify(sms.Body);
             switch (command.Kind)
             {
                 case InboundCommandKind.Approve:
@@ -71,13 +103,29 @@ public sealed class SmsInbound
                     break;
             }
 
-            await _state.CompleteMessageAsync(sms.MessageId, cancellationToken);
+            await _state.CompleteMessageAsync(sms.MessageSid, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "SMS message {MessageId} failed; releasing idempotency claim for retry", sms.MessageId);
-            await _state.ReleaseMessageAsync(sms.MessageId, cancellationToken);
+            _logger.LogError(ex, "SMS message {MessageSid} failed; releasing idempotency claim for retry", sms.MessageSid);
+            await _state.ReleaseMessageAsync(sms.MessageSid, cancellationToken);
             throw;
         }
+
+        return req.CreateResponse(HttpStatusCode.OK);
+    }
+
+    private static Dictionary<string, string> ParseFormBody(string body)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var pairs = body.Split('&', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var pair in pairs)
+        {
+            var parts = pair.Split('=', 2);
+            var key = HttpUtility.UrlDecode(parts[0]);
+            var value = parts.Length > 1 ? HttpUtility.UrlDecode(parts[1]) : string.Empty;
+            result[key] = value;
+        }
+        return result;
     }
 }

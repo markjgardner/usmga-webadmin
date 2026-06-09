@@ -20,14 +20,17 @@ param keyVaultUri string
 @description('Name of the Key Vault secret that will contain the GitHub token or app credential.')
 param githubCredentialSecretName string
 
-@description('Name of the Key Vault secret that will contain the Azure Communication Services connection string.')
-param acsConnectionStringSecretName string
+@description('Name of the Key Vault secret that will contain the Twilio Account SID.')
+param twilioAccountSidSecretName string
+
+@description('Name of the Key Vault secret that will contain the Twilio Auth Token.')
+param twilioAuthTokenSecretName string
 
 @description('Name of the Key Vault secret that will contain the shared secret used to authenticate the workflow -> NotifyRequester callback.')
 param notifySharedSecretName string
 
-@description('ACS-provisioned phone number used as the SMS From address, in E.164 format.')
-param smsFromNumber string = ''
+@description('Twilio phone number used as the SMS From address, in E.164 format.')
+param twilioFromNumber string = ''
 
 @description('Comma-separated allowlist of E.164 phone numbers permitted to submit change requests.')
 param smsAllowlist string = ''
@@ -101,15 +104,19 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${githubCredentialSecretName})'
         }
         {
-          name: 'Sms__ConnectionString'
-          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${acsConnectionStringSecretName})'
+          name: 'Twilio__AccountSid'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${twilioAccountSidSecretName})'
         }
         {
-          name: 'Sms__FromNumber'
-          value: smsFromNumber
+          name: 'Twilio__AuthToken'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${twilioAuthTokenSecretName})'
         }
         {
-          name: 'Sms__Allowlist'
+          name: 'Twilio__FromNumber'
+          value: twilioFromNumber
+        }
+        {
+          name: 'Twilio__Allowlist'
           value: smsAllowlist
         }
         {

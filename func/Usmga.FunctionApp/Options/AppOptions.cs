@@ -10,11 +10,11 @@ public sealed class GitHubOptions
     public string CopilotAssignee { get; set; } = "copilot-swe-agent[bot]";
 }
 
-public sealed class SmsOptions
+public sealed class TwilioOptions
 {
+    public string AccountSid { get; set; } = string.Empty;
+    public string AuthToken { get; set; } = string.Empty;
     public string FromNumber { get; set; } = string.Empty;
-    public string Endpoint { get; set; } = string.Empty;
-    public string ConnectionString { get; set; } = string.Empty;
     public string Allowlist { get; set; } = string.Empty;
     public string UploadBaseUrl { get; set; } = string.Empty;
 }
