@@ -38,13 +38,13 @@ internal sealed class InMemoryStateStore : IStateStore
         return Task.CompletedTask;
     }
 
-    public Task<string> CreateUploadTokenAsync(string code, string requesterPhone, CancellationToken cancellationToken) => Task.FromResult("upload-token");
+    public Task<string> CreateUploadTokenAsync(string code, string requesterChatId, CancellationToken cancellationToken) => Task.FromResult("upload-token");
 
     private static RequestRecord Clone(RequestRecord r) => new()
     {
         Code = r.Code,
         CorrelationNonce = r.CorrelationNonce,
-        RequesterPhone = r.RequesterPhone,
+        RequesterChatId = r.RequesterChatId,
         OriginalMessage = r.OriginalMessage,
         Status = r.Status,
         IssueNumber = r.IssueNumber,

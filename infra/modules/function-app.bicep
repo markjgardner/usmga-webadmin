@@ -20,23 +20,20 @@ param keyVaultUri string
 @description('Name of the Key Vault secret that will contain the GitHub token or app credential.')
 param githubCredentialSecretName string
 
-@description('Name of the Key Vault secret that will contain the Twilio Account SID.')
-param twilioAccountSidSecretName string
+@description('Name of the Key Vault secret that will contain the Telegram bot token from BotFather.')
+param telegramBotTokenSecretName string
 
-@description('Name of the Key Vault secret that will contain the Twilio Auth Token.')
-param twilioAuthTokenSecretName string
+@description('Name of the Key Vault secret that will contain the Telegram webhook secret token registered with setWebhook.')
+param telegramWebhookSecretName string
 
 @description('Name of the Key Vault secret that will contain the shared secret used to authenticate the workflow -> NotifyRequester callback.')
 param notifySharedSecretName string
 
-@description('Twilio phone number used as the SMS From address, in E.164 format.')
-param twilioFromNumber string = ''
+@description('Comma-separated Telegram numeric user IDs permitted to submit change requests.')
+param telegramAllowlist string = ''
 
-@description('Comma-separated allowlist of E.164 phone numbers permitted to submit change requests.')
-param smsAllowlist string = ''
-
-@description('Name of the storage table used by the function app for SMS/GitHub correlation state.')
-param correlationTableName string = 'SmsCorrelation'
+@description('Name of the storage table used by the function app for Telegram/GitHub correlation state.')
+param correlationTableName string = 'TelegramCorrelation'
 
 @description('Tags to apply to resources.')
 param tags object = {}
@@ -104,20 +101,20 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${githubCredentialSecretName})'
         }
         {
-          name: 'Twilio__AccountSid'
-          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${twilioAccountSidSecretName})'
+          name: 'Telegram__BotToken'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${telegramBotTokenSecretName})'
         }
         {
-          name: 'Twilio__AuthToken'
-          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${twilioAuthTokenSecretName})'
+          name: 'Telegram__WebhookSecret'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/${telegramWebhookSecretName})'
         }
         {
-          name: 'Twilio__FromNumber'
-          value: twilioFromNumber
+          name: 'Telegram__Allowlist'
+          value: telegramAllowlist
         }
         {
-          name: 'Twilio__Allowlist'
-          value: smsAllowlist
+          name: 'Telegram__UploadBaseUrl'
+          value: ''
         }
         {
           name: 'Notify__SharedSecret'

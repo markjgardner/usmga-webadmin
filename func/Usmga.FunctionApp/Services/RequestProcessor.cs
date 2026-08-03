@@ -10,21 +10,21 @@ namespace Usmga.FunctionApp.Services;
 public sealed class RequestProcessor
 {
     private readonly IGitHubClient _gitHub;
-    private readonly ISmsClient _sms;
+    private readonly IMessageChannel _channel;
     private readonly IStateStore _state;
     private readonly ITokenGenerator _tokens;
     private readonly MessageClassifier _classifier;
-    private readonly TwilioOptions _twilioOptions;
+    private readonly TelegramOptions _telegramOptions;
     private readonly ILogger<RequestProcessor> _logger;
 
-    public RequestProcessor(IGitHubClient gitHub, ISmsClient sms, IStateStore state, ITokenGenerator tokens, MessageClassifier classifier, IOptions<TwilioOptions> twilioOptions, ILogger<RequestProcessor> logger)
+    public RequestProcessor(IGitHubClient gitHub, IMessageChannel channel, IStateStore state, ITokenGenerator tokens, MessageClassifier classifier, IOptions<TelegramOptions> telegramOptions, ILogger<RequestProcessor> logger)
     {
         _gitHub = gitHub;
-        _sms = sms;
+        _channel = channel;
         _state = state;
         _tokens = tokens;
         _classifier = classifier;
-        _twilioOptions = twilioOptions.Value;
+        _telegramOptions = telegramOptions.Value;
         _logger = logger;
     }
 
@@ -37,7 +37,7 @@ public sealed class RequestProcessor
         {
             Code = code,
             CorrelationNonce = nonce,
-            RequesterPhone = from,
+            RequesterChatId = from,
             OriginalMessage = text,
             Status = RequestStatus.New
         };
@@ -55,14 +55,14 @@ public sealed class RequestProcessor
                 record.LastError = "Copilot was not assigned to the created issue.";
                 record.UpdatedAt = DateTimeOffset.UtcNow;
                 await _state.SaveRequestAsync(record, cancellationToken);
-                await _sms.SendAsync(from, $"USMGA request {code} could not be started safely because Copilot was not assigned. Please contact the web admin.", cancellationToken);
+                await _channel.SendAsync(from, $"USMGA request {code} could not be started safely because Copilot was not assigned. Please contact the web admin.", cancellationToken);
                 return;
             }
 
             record.Status = RequestStatus.AgentStarted;
             record.UpdatedAt = DateTimeOffset.UtcNow;
             await _state.SaveRequestAsync(record, cancellationToken);
-            await _sms.SendAsync(from, $"USMGA request {code} received. Copilot is preparing a preview. We'll text when it's ready." + (uploadLink is null ? string.Empty : $" Upload files: {uploadLink}"), cancellationToken);
+            await _channel.SendAsync(from, $"USMGA request {code} received. Copilot is preparing a preview. We'll message you here when it's ready." + (uploadLink is null ? string.Empty : $" Upload files: {uploadLink}"), cancellationToken);
         }
         catch (Exception ex)
         {
@@ -71,7 +71,7 @@ public sealed class RequestProcessor
             record.LastError = ex.Message;
             record.UpdatedAt = DateTimeOffset.UtcNow;
             await _state.SaveRequestAsync(record, cancellationToken);
-            await _sms.SendAsync(from, $"USMGA request {code} could not be started safely. Please contact the web admin.", cancellationToken);
+            await _channel.SendAsync(from, $"USMGA request {code} could not be started safely. Please contact the web admin.", cancellationToken);
         }
     }
 
@@ -80,13 +80,13 @@ public sealed class RequestProcessor
         var record = await _state.GetByCodeAsync(code, cancellationToken);
         if (!ApprovalNonceValid(record, from, approvalNonce))
         {
-            await _sms.SendAsync(from, "Approval rejected: invalid or expired code/nonce for this phone.", cancellationToken);
+            await _channel.SendAsync(from, "Approval rejected: invalid or expired code/nonce for this chat.", cancellationToken);
             return;
         }
 
         if (record!.PrNumber is null || string.IsNullOrWhiteSpace(record.ReviewedSha))
         {
-            await _sms.SendAsync(from, $"Request {code} needs a fresh preview before it can be approved.", cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} needs a fresh preview before it can be approved.", cancellationToken);
             return;
         }
 
@@ -96,14 +96,14 @@ public sealed class RequestProcessor
             record.Status = RequestStatus.Stale;
             record.UpdatedAt = DateTimeOffset.UtcNow;
             await _state.SaveRequestAsync(record, cancellationToken);
-            await _sms.SendAsync(from, $"Request {code} changed since your last preview and needs a fresh preview before publishing.", cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} changed since your last preview and needs a fresh preview before publishing.", cancellationToken);
             return;
         }
 
         var checks = await _gitHub.GetChecksAsync(pr.HeadSha, cancellationToken);
         if (checks.State == CheckState.Pending)
         {
-            await _sms.SendAsync(from, $"Request {code} checks are still running ({checks.Summary}). Reply APPROVE {code} {approvalNonce} again in a minute.", cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} checks are still running ({checks.Summary}). Reply APPROVE {code} {approvalNonce} again in a minute.", cancellationToken);
             return;
         }
 
@@ -112,7 +112,7 @@ public sealed class RequestProcessor
             record.Status = RequestStatus.Stale;
             record.UpdatedAt = DateTimeOffset.UtcNow;
             await _state.SaveRequestAsync(record, cancellationToken);
-            await _sms.SendAsync(from, $"Request {code} cannot be published: checks did not pass ({checks.Summary}). Reply CHANGES {code}: to ask Copilot to fix it.", cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} cannot be published: checks did not pass ({checks.Summary}). Reply CHANGES {code}: to ask Copilot to fix it.", cancellationToken);
             return;
         }
 
@@ -121,15 +121,15 @@ public sealed class RequestProcessor
         record.LastError = merge.Merged ? null : merge.Message;
         record.UpdatedAt = DateTimeOffset.UtcNow;
         await _state.SaveRequestAsync(record, cancellationToken);
-        await _sms.SendAsync(from, merge.Merged ? $"Request {code} approved and merged to production." : $"Request {code} was not merged: {merge.Message}", cancellationToken);
+        await _channel.SendAsync(from, merge.Merged ? $"Request {code} approved and merged to production." : $"Request {code} was not merged: {merge.Message}", cancellationToken);
     }
 
     public async Task HandleChangesAsync(string from, string code, string changes, CancellationToken cancellationToken)
     {
         var record = await _state.GetByCodeAsync(code, cancellationToken);
-        if (record is null || !StringComparer.OrdinalIgnoreCase.Equals(record.RequesterPhone, from))
+        if (record is null || !StringComparer.OrdinalIgnoreCase.Equals(record.RequesterChatId, from))
         {
-            await _sms.SendAsync(from, $"Request {code} was not found for this phone.", cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} was not found for this chat.", cancellationToken);
             return;
         }
 
@@ -141,7 +141,7 @@ public sealed class RequestProcessor
 
         if (record.PrNumber is null)
         {
-            await _sms.SendAsync(from, $"Request {code} does not have a PR yet. Please wait for the preview text.", cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} does not have a PR yet. Please wait for the preview message.", cancellationToken);
             return;
         }
 
@@ -152,7 +152,7 @@ public sealed class RequestProcessor
         record.ApprovalNonceExpiresAt = null;
         record.UpdatedAt = DateTimeOffset.UtcNow;
         await _state.SaveRequestAsync(record, cancellationToken);
-        await _sms.SendAsync(from, $"Request {code}: changes sent to Copilot. We'll text a fresh preview when ready.", cancellationToken);
+        await _channel.SendAsync(from, $"Request {code}: changes sent to Copilot. We'll message you here when a fresh preview is ready.", cancellationToken);
     }
 
     public async Task NotifyPreviewAsync(NotifyRequest request, CancellationToken cancellationToken)
@@ -188,13 +188,13 @@ public sealed class RequestProcessor
         record.Status = RequestStatus.PreviewDeployed;
         record.UpdatedAt = DateTimeOffset.UtcNow;
         await _state.SaveRequestAsync(record, cancellationToken);
-        await _sms.SendAsync(record.RequesterPhone, $"Preview for {record.Code}: {record.PreviewUrl} Reply APPROVE {record.Code} {record.ApprovalNonce} to publish, or CHANGES {record.Code}: your requested revision.", cancellationToken);
+        await _channel.SendAsync(record.RequesterChatId, $"Preview for {record.Code}: {record.PreviewUrl} Reply APPROVE {record.Code} {record.ApprovalNonce} to publish, or CHANGES {record.Code}: your requested revision.", cancellationToken);
     }
 
     public bool ApprovalNonceValid(RequestRecord? record, string from, string approvalNonce)
     {
         return record is not null
-            && StringComparer.OrdinalIgnoreCase.Equals(record.RequesterPhone, from)
+            && StringComparer.OrdinalIgnoreCase.Equals(record.RequesterChatId, from)
             && !string.IsNullOrWhiteSpace(record.ApprovalNonce)
             && FixedTimeEquals(record.ApprovalNonce, approvalNonce)
             && record.ApprovalNonceExpiresAt is not null
@@ -211,23 +211,23 @@ public sealed class RequestProcessor
 
     private async Task<string?> MaybeCreateUploadLinkAsync(string code, string from, string text, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(_twilioOptions.UploadBaseUrl) || !_classifier.SuggestsAttachment(text))
+        if (string.IsNullOrWhiteSpace(_telegramOptions.UploadBaseUrl) || !_classifier.SuggestsAttachment(text))
         {
             return null;
         }
 
         var token = await _state.CreateUploadTokenAsync(code, from, cancellationToken);
-        return $"{_twilioOptions.UploadBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(token)}";
+        return $"{_telegramOptions.UploadBaseUrl.TrimEnd('/')}/{Uri.EscapeDataString(token)}";
     }
 
-    private static string BuildIssueTitle(string code, string nonce) => $"[USMGA-SMS {code}] Website change request {nonce}";
+    private static string BuildIssueTitle(string code, string nonce) => $"[USMGA-TG {code}] Website change request {nonce}";
 
     private static string BuildIssueBody(RequestRecord record, string? uploadLink) => $"""
-SMS-driven website change request.
+Telegram-driven website change request.
 
 Request code: {record.Code}
 Correlation nonce: {record.CorrelationNonce}
-Requester phone: {record.RequesterPhone}
+Requester chat ID: {record.RequesterChatId}
 Received UTC: {record.CreatedAt:O}
 
 Request:

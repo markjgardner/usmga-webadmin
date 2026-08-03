@@ -64,11 +64,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${NOTIFY_FUNCTION_URL}" ] || [ -z "${NOTIFY_SHARED_SECRET}" ]; then
-            echo "NotifyRequester secrets are not configured; skipping SMS notification."
+            echo "NotifyRequester secrets are not configured; skipping Telegram notification."
             exit 0
           fi
           if [ -z "${PREVIEW_URL}" ]; then
-            echo "Static Web Apps deploy did not expose static_web_app_url; skipping SMS notification."
+            echo "Static Web Apps deploy did not expose static_web_app_url; skipping Telegram notification."
             exit 0
           fi
           payload=$(jq -n \
