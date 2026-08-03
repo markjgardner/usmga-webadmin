@@ -19,28 +19,25 @@ param staticWebAppLocation string = 'eastus2'
 @description('Name of the Key Vault secret that operators will create for the GitHub PAT or GitHub App credential.')
 param githubCredentialSecretName string = 'github-credential'
 
-@description('Name of the Key Vault secret that operators will create for the Twilio Account SID.')
-param twilioAccountSidSecretName string = 'twilio-account-sid'
+@description('Name of the Key Vault secret that operators will create for the Telegram bot token from BotFather.')
+param telegramBotTokenSecretName string = 'telegram-bot-token'
 
-@description('Name of the Key Vault secret that operators will create for the Twilio Auth Token.')
-param twilioAuthTokenSecretName string = 'twilio-auth-token'
+@description('Name of the Key Vault secret that operators will create for the Telegram webhook secret token registered with setWebhook.')
+param telegramWebhookSecretName string = 'telegram-webhook-secret'
 
 @description('Name of the Key Vault secret that operators will create for the shared secret used to authenticate the workflow -> NotifyRequester callback. Must match the NOTIFY_SHARED_SECRET GitHub Actions secret.')
 param notifySharedSecretName string = 'notify-shared-secret'
 
-@description('Twilio phone number used as the SMS From address, in E.164 format (for example +15551234567).')
-param twilioFromNumber string = ''
+@description('Comma-separated Telegram numeric user IDs permitted to submit change requests.')
+param telegramAllowlist string = ''
 
-@description('Comma-separated allowlist of E.164 phone numbers permitted to submit change requests.')
-param smsAllowlist string = ''
-
-@description('Storage table name used for SMS/GitHub correlation state.')
-param correlationTableName string = 'SmsCorrelation'
+@description('Storage table name used for Telegram/GitHub correlation state.')
+param correlationTableName string = 'TelegramCorrelation'
 
 @description('Tags applied to all resources.')
 param tags object = {
   project: 'usmga-webadmin'
-  workload: 'sms-website-change-pipeline'
+  workload: 'telegram-website-change-pipeline'
 }
 
 var suffix = uniqueString(resourceGroup().id)
@@ -95,11 +92,10 @@ module functionApp 'modules/function-app.bicep' = {
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     keyVaultUri: keyVault.outputs.vaultUri
     githubCredentialSecretName: githubCredentialSecretName
-    twilioAccountSidSecretName: twilioAccountSidSecretName
-    twilioAuthTokenSecretName: twilioAuthTokenSecretName
+    telegramBotTokenSecretName: telegramBotTokenSecretName
+    telegramWebhookSecretName: telegramWebhookSecretName
     notifySharedSecretName: notifySharedSecretName
-    twilioFromNumber: twilioFromNumber
-    smsAllowlist: smsAllowlist
+    telegramAllowlist: telegramAllowlist
     correlationTableName: correlationTableName
     tags: tags
   }
@@ -133,4 +129,3 @@ output correlationTableName string = correlationTableName
 output keyVaultName string = keyVault.outputs.name
 output logAnalyticsWorkspaceId string = monitoring.outputs.workspaceId
 output applicationInsightsId string = monitoring.outputs.appInsightsId
-

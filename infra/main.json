@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "16947564689900232551"
+      "templateHash": "7907365445178173528"
     }
   },
   "parameters": {
@@ -49,18 +49,18 @@
         "description": "Name of the Key Vault secret that operators will create for the GitHub PAT or GitHub App credential."
       }
     },
-    "twilioAccountSidSecretName": {
+    "telegramBotTokenSecretName": {
       "type": "string",
-      "defaultValue": "twilio-account-sid",
+      "defaultValue": "telegram-bot-token",
       "metadata": {
-        "description": "Name of the Key Vault secret that operators will create for the Twilio Account SID."
+        "description": "Name of the Key Vault secret that operators will create for the Telegram bot token from BotFather."
       }
     },
-    "twilioAuthTokenSecretName": {
+    "telegramWebhookSecretName": {
       "type": "string",
-      "defaultValue": "twilio-auth-token",
+      "defaultValue": "telegram-webhook-secret",
       "metadata": {
-        "description": "Name of the Key Vault secret that operators will create for the Twilio Auth Token."
+        "description": "Name of the Key Vault secret that operators will create for the Telegram webhook secret token registered with setWebhook."
       }
     },
     "notifySharedSecretName": {
@@ -70,32 +70,25 @@
         "description": "Name of the Key Vault secret that operators will create for the shared secret used to authenticate the workflow -> NotifyRequester callback. Must match the NOTIFY_SHARED_SECRET GitHub Actions secret."
       }
     },
-    "twilioFromNumber": {
+    "telegramAllowlist": {
       "type": "string",
       "defaultValue": "",
       "metadata": {
-        "description": "Twilio phone number used as the SMS From address, in E.164 format (for example +15551234567)."
-      }
-    },
-    "smsAllowlist": {
-      "type": "string",
-      "defaultValue": "",
-      "metadata": {
-        "description": "Comma-separated allowlist of E.164 phone numbers permitted to submit change requests."
+        "description": "Comma-separated Telegram numeric user IDs permitted to submit change requests."
       }
     },
     "correlationTableName": {
       "type": "string",
-      "defaultValue": "SmsCorrelation",
+      "defaultValue": "TelegramCorrelation",
       "metadata": {
-        "description": "Storage table name used for SMS/GitHub correlation state."
+        "description": "Storage table name used for Telegram/GitHub correlation state."
       }
     },
     "tags": {
       "type": "object",
       "defaultValue": {
         "project": "usmga-webadmin",
-        "workload": "sms-website-change-pipeline"
+        "workload": "telegram-website-change-pipeline"
       },
       "metadata": {
         "description": "Tags applied to all resources."
@@ -261,7 +254,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "11248080986143501671"
+              "templateHash": "9082505401423004095"
             }
           },
           "parameters": {
@@ -279,9 +272,9 @@
             },
             "correlationTableName": {
               "type": "string",
-              "defaultValue": "SmsCorrelation",
+              "defaultValue": "TelegramCorrelation",
               "metadata": {
-                "description": "Name of the table used for SMS/GitHub correlation state."
+                "description": "Name of the table used for Telegram/GitHub correlation state."
               }
             },
             "tags": {
@@ -479,20 +472,17 @@
           "githubCredentialSecretName": {
             "value": "[parameters('githubCredentialSecretName')]"
           },
-          "twilioAccountSidSecretName": {
-            "value": "[parameters('twilioAccountSidSecretName')]"
+          "telegramBotTokenSecretName": {
+            "value": "[parameters('telegramBotTokenSecretName')]"
           },
-          "twilioAuthTokenSecretName": {
-            "value": "[parameters('twilioAuthTokenSecretName')]"
+          "telegramWebhookSecretName": {
+            "value": "[parameters('telegramWebhookSecretName')]"
           },
           "notifySharedSecretName": {
             "value": "[parameters('notifySharedSecretName')]"
           },
-          "twilioFromNumber": {
-            "value": "[parameters('twilioFromNumber')]"
-          },
-          "smsAllowlist": {
-            "value": "[parameters('smsAllowlist')]"
+          "telegramAllowlist": {
+            "value": "[parameters('telegramAllowlist')]"
           },
           "correlationTableName": {
             "value": "[parameters('correlationTableName')]"
@@ -508,7 +498,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "8645900534857896631"
+              "templateHash": "16501694212869027326"
             }
           },
           "parameters": {
@@ -554,16 +544,16 @@
                 "description": "Name of the Key Vault secret that will contain the GitHub token or app credential."
               }
             },
-            "twilioAccountSidSecretName": {
+            "telegramBotTokenSecretName": {
               "type": "string",
               "metadata": {
-                "description": "Name of the Key Vault secret that will contain the Twilio Account SID."
+                "description": "Name of the Key Vault secret that will contain the Telegram bot token from BotFather."
               }
             },
-            "twilioAuthTokenSecretName": {
+            "telegramWebhookSecretName": {
               "type": "string",
               "metadata": {
-                "description": "Name of the Key Vault secret that will contain the Twilio Auth Token."
+                "description": "Name of the Key Vault secret that will contain the Telegram webhook secret token registered with setWebhook."
               }
             },
             "notifySharedSecretName": {
@@ -572,25 +562,18 @@
                 "description": "Name of the Key Vault secret that will contain the shared secret used to authenticate the workflow -> NotifyRequester callback."
               }
             },
-            "twilioFromNumber": {
+            "telegramAllowlist": {
               "type": "string",
               "defaultValue": "",
               "metadata": {
-                "description": "Twilio phone number used as the SMS From address, in E.164 format."
-              }
-            },
-            "smsAllowlist": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Comma-separated allowlist of E.164 phone numbers permitted to submit change requests."
+                "description": "Comma-separated Telegram numeric user IDs permitted to submit change requests."
               }
             },
             "correlationTableName": {
               "type": "string",
-              "defaultValue": "SmsCorrelation",
+              "defaultValue": "TelegramCorrelation",
               "metadata": {
-                "description": "Name of the storage table used by the function app for SMS/GitHub correlation state."
+                "description": "Name of the storage table used by the function app for Telegram/GitHub correlation state."
               }
             },
             "tags": {
@@ -668,20 +651,20 @@
                       "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('githubCredentialSecretName'))]"
                     },
                     {
-                      "name": "Twilio__AccountSid",
-                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('twilioAccountSidSecretName'))]"
+                      "name": "Telegram__BotToken",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('telegramBotTokenSecretName'))]"
                     },
                     {
-                      "name": "Twilio__AuthToken",
-                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('twilioAuthTokenSecretName'))]"
+                      "name": "Telegram__WebhookSecret",
+                      "value": "[format('@Microsoft.KeyVault(SecretUri={0}secrets/{1})', parameters('keyVaultUri'), parameters('telegramWebhookSecretName'))]"
                     },
                     {
-                      "name": "Twilio__FromNumber",
-                      "value": "[parameters('twilioFromNumber')]"
+                      "name": "Telegram__Allowlist",
+                      "value": "[parameters('telegramAllowlist')]"
                     },
                     {
-                      "name": "Twilio__Allowlist",
-                      "value": "[parameters('smsAllowlist')]"
+                      "name": "Telegram__UploadBaseUrl",
+                      "value": ""
                     },
                     {
                       "name": "Notify__SharedSecret",

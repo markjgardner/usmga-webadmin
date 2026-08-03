@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Configure main branch protection for the SMS approval pipeline.
+# Configure main branch protection for the Telegram approval pipeline.
 #
 # WHY THIS MATTERS:
-# The Azure Function can merge approved Copilot PRs after an SMS approval. Branch
+# The Azure Function can merge approved Copilot PRs after a Telegram approval. Branch
 # protection is the safety net that prevents the Function from merging code unless
 # GitHub has first built and tested the PR successfully.
 #
-# IMPORTANT — two settings are tuned for the SMS auto-merge flow:
+# IMPORTANT — two settings are tuned for the Telegram auto-merge flow:
 #   * REQUIRED_APPROVING_REVIEW_COUNT defaults to 0. A value > 0 would require a human
 #     approving review, which BLOCKS the Function's PAT auto-merge (GitHub returns 405
-#     for a non-admin bot merging with 0 approvals). The SMS approval + the required
+#     for a non-admin bot merging with 0 approvals). The Telegram approval + the required
 #     status checks below are the gate. Set this to 0 unless you add the bot as a
 #     branch-protection bypass actor or have a human approve every change.
 #   * REQUIRED_CHECKS lists only the always-run CI jobs (ci.yml has no path filter).

@@ -98,13 +98,13 @@ public sealed class TableStateStore : IStateStore
         await _table.UpsertEntityAsync(ToEntity(record), TableUpdateMode.Replace, cancellationToken);
     }
 
-    public async Task<string> CreateUploadTokenAsync(string code, string requesterPhone, CancellationToken cancellationToken)
+    public async Task<string> CreateUploadTokenAsync(string code, string requesterChatId, CancellationToken cancellationToken)
     {
         var token = _tokens.NewNonce(24);
         var entity = new TableEntity(UploadPartition, token)
         {
             ["Code"] = code,
-            ["RequesterPhone"] = requesterPhone,
+            ["RequesterChatId"] = requesterChatId,
             ["CreatedAt"] = DateTimeOffset.UtcNow,
             ["Used"] = false
         };
@@ -118,7 +118,7 @@ public sealed class TableStateStore : IStateStore
         {
             ["Code"] = record.Code.ToUpperInvariant(),
             ["CorrelationNonce"] = record.CorrelationNonce,
-            ["RequesterPhone"] = record.RequesterPhone,
+            ["RequesterChatId"] = record.RequesterChatId,
             ["OriginalMessage"] = record.OriginalMessage,
             ["Status"] = record.Status,
             ["CreatedAt"] = record.CreatedAt,
@@ -139,7 +139,7 @@ public sealed class TableStateStore : IStateStore
     {
         Code = entity.GetString("Code") ?? entity.RowKey,
         CorrelationNonce = entity.GetString("CorrelationNonce") ?? string.Empty,
-        RequesterPhone = entity.GetString("RequesterPhone") ?? string.Empty,
+        RequesterChatId = entity.GetString("RequesterChatId") ?? string.Empty,
         OriginalMessage = entity.GetString("OriginalMessage") ?? string.Empty,
         Status = entity.GetString("Status") ?? RequestStatus.New,
         IssueNumber = entity.TryGetValue("IssueNumber", out var issue) ? Convert.ToInt32(issue) : null,

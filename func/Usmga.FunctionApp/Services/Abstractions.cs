@@ -14,9 +14,9 @@ public interface IGitHubClient
     Task PostCopilotPrCommentAsync(int prNumber, string text, CancellationToken cancellationToken);
 }
 
-public interface ISmsClient
+public interface IMessageChannel
 {
-    Task SendAsync(string to, string message, CancellationToken cancellationToken);
+    Task SendAsync(string chatId, string message, CancellationToken cancellationToken);
 }
 
 public interface IStateStore
@@ -28,7 +28,7 @@ public interface IStateStore
     Task<RequestRecord?> GetByCodeAsync(string code, CancellationToken cancellationToken);
     Task<RequestRecord?> FindByIssueOrPrAsync(int? issueNumber, int? prNumber, CancellationToken cancellationToken);
     Task SaveRequestAsync(RequestRecord record, CancellationToken cancellationToken);
-    Task<string> CreateUploadTokenAsync(string code, string requesterPhone, CancellationToken cancellationToken);
+    Task<string> CreateUploadTokenAsync(string code, string requesterChatId, CancellationToken cancellationToken);
 }
 
 public interface ITokenGenerator

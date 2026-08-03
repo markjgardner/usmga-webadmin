@@ -23,7 +23,7 @@ public sealed class HighValueFixTests
         var github = new FakeGitHubClient { PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url"), Checks = new CheckStatus(CheckState.Passed, "ok") };
         var sms = new FakeSmsClient();
 
-        await NewProcessor(github, sms, state).HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+        await NewProcessor(github, sms, state).HandleApproveAsync("111111111", "ABC123", "nonce", CancellationToken.None);
 
         Assert.True(github.MergeCalled);
         Assert.Equal("reviewed-sha", github.ExpectedSha);
@@ -38,7 +38,7 @@ public sealed class HighValueFixTests
         var github = new FakeGitHubClient { PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url"), Checks = new CheckStatus(CheckState.Failed, "check-runs failed") };
         var sms = new FakeSmsClient();
 
-        await NewProcessor(github, sms, state).HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+        await NewProcessor(github, sms, state).HandleApproveAsync("111111111", "ABC123", "nonce", CancellationToken.None);
 
         Assert.False(github.MergeCalled);
         Assert.Equal(RequestStatus.Stale, (await state.GetByCodeAsync("ABC123", CancellationToken.None))!.Status);
@@ -55,31 +55,31 @@ public sealed class HighValueFixTests
         var github = new FakeGitHubClient();
         var sms = new FakeSmsClient();
 
-        await NewProcessor(github, sms, state).HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+        await NewProcessor(github, sms, state).HandleApproveAsync("111111111", "ABC123", "nonce", CancellationToken.None);
 
         Assert.False(github.MergeCalled);
         Assert.Contains("Approval rejected", sms.Messages.Single().Message);
     }
 
     [Fact]
-    public async Task WrongPhoneOnChangesIsRejectedWithoutPrComment()
+    public async Task WrongChatOnChangesIsRejectedWithoutPrComment()
     {
         var state = new InMemoryStateStore();
         await state.CreateRequestAsync(PreviewRecord(), CancellationToken.None);
         var github = new FakeGitHubClient();
         var sms = new FakeSmsClient();
 
-        await NewProcessor(github, sms, state).HandleChangesAsync("+15550000002", "ABC123", "make it blue", CancellationToken.None);
+        await NewProcessor(github, sms, state).HandleChangesAsync("222222222", "ABC123", "make it blue", CancellationToken.None);
 
         Assert.False(github.CommentCalled);
-        Assert.Contains("not found for this phone", sms.Messages.Single().Message);
+        Assert.Contains("not found for this chat", sms.Messages.Single().Message);
     }
 
     [Fact]
     public void MalformedApproveClassifiesAsInvalid()
     {
-        var twilioOptions = Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001" });
-        var classifier = new MessageClassifier(twilioOptions);
+        var telegramOptions = Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111" });
+        var classifier = new MessageClassifier(telegramOptions);
 
         var command = classifier.Classify("APPROVE abc123");
 
@@ -138,7 +138,7 @@ public sealed class HighValueFixTests
     public async Task NotifyPreviewResolvesRecordByPrLinkedIssue()
     {
         var state = new InMemoryStateStore();
-        await state.CreateRequestAsync(new RequestRecord { Code = "ABC123", IssueNumber = 123, RequesterPhone = "+15550000001", CorrelationNonce = "corr" }, CancellationToken.None);
+        await state.CreateRequestAsync(new RequestRecord { Code = "ABC123", IssueNumber = 123, RequesterChatId = "111111111", CorrelationNonce = "corr" }, CancellationToken.None);
         var github = new FakeGitHubClient { LinkedIssueNumber = 123 };
         var sms = new FakeSmsClient();
 
@@ -153,7 +153,7 @@ public sealed class HighValueFixTests
     {
         Code = "ABC123",
         CorrelationNonce = "corr",
-        RequesterPhone = "+15550000001",
+        RequesterChatId = "111111111",
         Status = RequestStatus.PreviewDeployed,
         PrNumber = 42,
         ReviewedSha = "reviewed-sha",
@@ -163,8 +163,8 @@ public sealed class HighValueFixTests
 
     private static RequestProcessor NewProcessor(FakeGitHubClient github, FakeSmsClient sms, InMemoryStateStore state)
     {
-        var twilioOptions = Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001,+15550000002" });
-        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(twilioOptions), twilioOptions, NullLogger<RequestProcessor>.Instance);
+        var telegramOptions = Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111,222222222" });
+        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(telegramOptions), telegramOptions, NullLogger<RequestProcessor>.Instance);
     }
 
     private static NotifyRequester NewNotifyRequester(string sharedSecret)
@@ -182,7 +182,7 @@ public sealed class HighValueFixTests
         public string NewNonce(int bytes = 16) => bytes == 12 ? "approval-nonce" : "fixed-nonce";
     }
 
-    private sealed class FakeSmsClient : ISmsClient
+    private sealed class FakeSmsClient : IMessageChannel
     {
         public List<(string To, string Message)> Messages { get; } = new();
         public Task SendAsync(string to, string message, CancellationToken cancellationToken)

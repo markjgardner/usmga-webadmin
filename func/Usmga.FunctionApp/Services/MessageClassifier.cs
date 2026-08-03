@@ -13,20 +13,13 @@ public sealed class MessageClassifier
     private static readonly Regex ChangesPrefixPattern = new(@"^\s*CHANGES\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private readonly HashSet<string> _allowed;
 
-    public MessageClassifier(IOptions<TwilioOptions> options)
+    public MessageClassifier(IOptions<TelegramOptions> options)
     {
         _allowed = options.Value.Allowlist.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(NormalizePhone)
-            .Where(p => p is not null)
-            .Select(p => p!)
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    public bool IsAllowed(string phone)
-    {
-        var normalized = NormalizePhone(phone);
-        return _allowed.Count > 0 && normalized is not null && _allowed.Contains(normalized);
-    }
+    public bool IsAllowed(string userId) => _allowed.Count > 0 && _allowed.Contains(userId);
 
     public InboundCommand Classify(string message)
     {
@@ -59,17 +52,5 @@ public sealed class MessageClassifier
     {
         var lower = (message ?? string.Empty).ToLowerInvariant();
         return lower.Contains("attach") || lower.Contains("attachment") || lower.Contains("screenshot") || lower.Contains("photo") || lower.Contains("image") || lower.Contains("file");
-    }
-
-    private static string? NormalizePhone(string? phone)
-    {
-        if (string.IsNullOrWhiteSpace(phone)) return null;
-        var value = phone.Trim();
-        if (value.StartsWith("00", StringComparison.Ordinal)) value = "+" + value[2..];
-        value = new string(value.Where(c => c == '+' || char.IsDigit(c)).ToArray());
-        if (value.Count(c => c == '+') > 1) return null;
-        if (value.StartsWith('+')) value = "+" + new string(value.Skip(1).Where(char.IsDigit).ToArray());
-        else value = "+" + new string(value.Where(char.IsDigit).ToArray());
-        return value.Length > 1 ? value : null;
     }
 }

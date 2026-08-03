@@ -4,7 +4,7 @@ public sealed class RequestRecord
 {
     public string Code { get; set; } = string.Empty;
     public string CorrelationNonce { get; set; } = string.Empty;
-    public string RequesterPhone { get; set; } = string.Empty;
+    public string RequesterChatId { get; set; } = string.Empty;
     public string OriginalMessage { get; set; } = string.Empty;
     public string Status { get; set; } = RequestStatus.New;
     public int? IssueNumber { get; set; }

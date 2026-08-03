@@ -28,12 +28,12 @@ Three independent stacks share this repo:
 | `func/` | C# .NET 8 isolated Azure Functions v4 | `func/Usmga.FunctionApp/Program.cs` |
 | `infra/` | Bicep modules | `infra/main.bicep` orchestrates all modules |
 
-### SMS → Copilot pipeline (func/)
+### Telegram → Copilot pipeline (func/)
 
 The function app has two thin entry-point functions that delegate to a service layer:
 
-- **SmsInbound** (HTTP trigger, `POST /api/sms/inbound`) — receives Twilio inbound SMS webhooks, validates the Twilio request signature, deduplicates on `MessageSid` (claim/complete/release pattern), classifies the message, and dispatches to `RequestProcessor`.
-- **NotifyRequester** (HTTP trigger) — receives GitHub Actions callbacks with preview URLs; validates a shared secret header before sending SMS replies.
+- **TelegramInbound** (HTTP trigger, `POST /api/telegram/webhook`) — receives Telegram Bot webhooks, validates the `X-Telegram-Bot-Api-Secret-Token` header against the configured webhook secret in constant time, deduplicates updates (claim/complete/release pattern), classifies the message, and dispatches to `RequestProcessor`.
+- **NotifyRequester** (HTTP trigger) — receives GitHub Actions callbacks with preview URLs; validates a shared secret header before sending Telegram replies.
 
 Core orchestration lives in `RequestProcessor`, which handles new requests (creates GitHub issues + assigns Copilot), approvals (merges PRs with SHA + status checks guard), and change requests (`@copilot` PR comments).
 
@@ -44,7 +44,7 @@ Core orchestration lives in `RequestProcessor`, which handles new requests (crea
 | Section | Env var prefix | Source |
 |---------|---------------|--------|
 | `GitHub` | `GitHub__` | Key Vault reference |
-| `Twilio` | `Twilio__` | Key Vault (AccountSid, AuthToken) + app settings (FromNumber, Allowlist) |
+| `Telegram` | `Telegram__` | Key Vault (BotToken, WebhookSecret) + app settings (Allowlist, UploadBaseUrl) |
 | `Storage` | `Storage__` | App setting (connection string + table name) |
 | `Notify` | `Notify__` | Key Vault reference |
 
@@ -76,14 +76,14 @@ All services are registered as singletons. `IGitHubClient` uses `AddHttpClient<>
 
 - Bicep modules under `infra/modules/`; the orchestrator is `infra/main.bicep`.
 - App settings requiring secrets use Key Vault references (`@Microsoft.KeyVault(SecretUri=...)`).
-- Twilio credentials (Account SID + Auth Token) are stored in Key Vault; phone number and allowlist are plain app settings.
+- Telegram credentials (`telegram-bot-token` + `telegram-webhook-secret`) are stored in Key Vault; numeric user ID allowlist and upload base URL are plain app settings.
 
 ## CI/CD workflows
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | PR (any path) | Build validation: site + func + Bicep |
-| `site-preview.yml` | PR (`site/**`) | Deploy SWA preview + SMS notification |
+| `site-preview.yml` | PR (`site/**`) | Deploy SWA preview + Telegram notification |
 | `site-prod.yml` | Push to main (`site/**`) | Deploy SWA production |
 | `func-deploy.yml` | Push to main (`func/**`) | Build, test, publish function app |
 

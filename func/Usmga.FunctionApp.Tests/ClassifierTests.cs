@@ -7,7 +7,7 @@ namespace Usmga.FunctionApp.Tests;
 
 public sealed class ClassifierTests
 {
-    private static MessageClassifier Classifier() => new(Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001,+15550000002" }));
+    private static MessageClassifier Classifier() => new(Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111,222222222" }));
 
     [Fact]
     public void ParsesApproveWithCodeAndNonce()
@@ -43,13 +43,11 @@ public sealed class ClassifierTests
     }
 
     [Theory]
-    [InlineData("+15550000001", true)]
-    [InlineData("+1 555 000 0001", true)]
-    [InlineData("1 (555) 000-0001", true)]
-    [InlineData("0015550000001", true)]
-    [InlineData("+15559999999", false)]
-    public void EnforcesAllowlistWithE164Normalization(string phone, bool expected)
+    [InlineData("111111111", true)]
+    [InlineData("222222222", true)]
+    [InlineData("333333333", false)]
+    public void EnforcesTelegramUserIdAllowlist(string userId, bool expected)
     {
-        Assert.Equal(expected, Classifier().IsAllowed(phone));
+        Assert.Equal(expected, Classifier().IsAllowed(userId));
     }
 }
