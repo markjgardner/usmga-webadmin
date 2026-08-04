@@ -160,6 +160,48 @@ Pushing to `main` deploys automatically: `func-deploy.yml` (on `func/**`) and `s
 (on `site/**`). Pull requests trigger `ci.yml` (build validation) and `site-preview.yml`
 (preview deploy + Telegram notification).
 
+## Verifying the bot without a phone
+
+Telegram updates are just JSON, so the deployed webhook can be driven directly. This is the
+fastest way to confirm a deployment is healthy, and the only practical way to exercise the
+rejection paths (a wrong secret, a non-allowlisted sender, a tampered button payload).
+
+```bash
+KEY=$(az functionapp keys list -g usmga-rg -n <func-app> --query "functionKeys.default" -o tsv)
+SEC=<telegram-webhook-secret>   # Key Vault: telegram-webhook-secret
+
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  -X POST "https://<func-app>.azurewebsites.net/api/telegram/webhook?code=$KEY" \
+  -H 'Content-Type: application/json' \
+  -H "X-Telegram-Bot-Api-Secret-Token: $SEC" \
+  -d '{"update_id":1,"message":{"message_id":1,"chat":{"id":<chat>},"from":{"id":<user>},"text":"/status"}}'
+```
+
+Expect `200`. A wrong secret gives `403`. A button tap is the same call with a `callback_query`
+instead of a `message`:
+
+```json
+{"update_id":2,"callback_query":{"id":"1","from":{"id":<user>},
+ "message":{"message_id":1,"chat":{"id":<chat>}},"data":"a:<CODE>:<nonce>"}}
+```
+
+Two things to know before reading anything into the result:
+
+- **`update_id` must be new each time.** Repeats are deduplicated and silently return `200`
+  without doing anything, which looks identical to success.
+- **Use your real chat id.** Every reply is a real `sendMessage`, so an invented chat id makes
+  Telegram return `400 chat not found`; the function then reports `500` even though its own
+  logic ran correctly.
+
+Request state is in the `TelegramCorrelation` table, which is the quickest way to confirm what
+actually happened:
+
+```bash
+az storage entity query --table-name TelegramCorrelation --connection-string "$CS" \
+  --filter "PartitionKey eq 'request'" \
+  --query "items[].{Code:Code,Status:Status,Pr:PrNumber}" -o table
+```
+
 ## License
 
 See [LICENSE](LICENSE).
