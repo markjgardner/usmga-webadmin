@@ -86,4 +86,8 @@ jobs:
             echo "Failing the job so the missing requester notification is visible and can be retried by re-running the workflow."
             exit 1
           fi
-          echo "NotifyRequester accepted preview notification for PR #${PR_NUMBER}."
+          if [ "${status}" = "204" ]; then
+            echo "PR #${PR_NUMBER} has no originating request, so no requester was notified."
+          else
+            echo "NotifyRequester accepted preview notification for PR #${PR_NUMBER}."
+          fi

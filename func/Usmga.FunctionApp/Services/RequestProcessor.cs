@@ -155,7 +155,8 @@ public sealed class RequestProcessor
         await _channel.SendAsync(from, $"Request {code}: changes sent to Copilot. We'll message you here when a fresh preview is ready.", cancellationToken);
     }
 
-    public async Task NotifyPreviewAsync(NotifyRequest request, CancellationToken cancellationToken)
+    /// <summary>Returns false when the preview has no originating request to notify (e.g. a human-authored PR).</summary>
+    public async Task<bool> NotifyPreviewAsync(NotifyRequest request, CancellationToken cancellationToken)
     {
         var record = !string.IsNullOrWhiteSpace(request.Code)
             ? await _state.GetByCodeAsync(request.Code!, cancellationToken)
@@ -172,7 +173,7 @@ public sealed class RequestProcessor
 
         if (record is null)
         {
-            throw new InvalidOperationException("No matching request record was found.");
+            return false;
         }
 
         if (request.PrNumber is not null)
@@ -189,6 +190,7 @@ public sealed class RequestProcessor
         record.UpdatedAt = DateTimeOffset.UtcNow;
         await _state.SaveRequestAsync(record, cancellationToken);
         await _channel.SendAsync(record.RequesterChatId, $"Preview for {record.Code}: {record.PreviewUrl} Reply APPROVE {record.Code} {record.ApprovalNonce} to publish, or CHANGES {record.Code}: your requested revision.", cancellationToken);
+        return true;
     }
 
     public bool ApprovalNonceValid(RequestRecord? record, string from, string approvalNonce)
