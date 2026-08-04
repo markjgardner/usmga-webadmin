@@ -126,6 +126,51 @@ public sealed class HighValueFixTests
     }
 
     [Theory]
+    [InlineData("Copilot")]
+    [InlineData("copilot-swe-agent")]
+    [InlineData("copilot-swe-agent[bot]")]
+    [InlineData("app/copilot-swe-agent")]
+    public async Task CreateIssueDetectsCopilotUnderAnyReportedLogin(string assigneeLogin)
+    {
+        var handler = new SequenceHandler(
+            new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = JsonContent(new
+                {
+                    number = 4,
+                    html_url = "https://github.test/issues/4",
+                    assignees = new[] { new { login = "markjgardner", node_id = "MDQ6VXNlcjE=" }, new { login = assigneeLogin, node_id = "BOT_kgDOC9w8XQ" } }
+                })
+            });
+        var client = new GitHubClient(new HttpClient(handler), Microsoft.Extensions.Options.Options.Create(new GitHubOptions { ApiBaseUrl = "https://api.github.test", Token = "token" }));
+
+        var issue = await client.CreateIssueForCopilotAsync("title", "body", CancellationToken.None);
+
+        Assert.Equal(4, issue.Number);
+        Assert.True(issue.CopilotAssigned);
+    }
+
+    [Fact]
+    public async Task CreateIssueReportsUnassignedWhenOnlyHumansAreAssigned()
+    {
+        var handler = new SequenceHandler(
+            new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = JsonContent(new
+                {
+                    number = 4,
+                    html_url = "https://github.test/issues/4",
+                    assignees = new[] { new { login = "markjgardner", node_id = "MDQ6VXNlcjE=" } }
+                })
+            });
+        var client = new GitHubClient(new HttpClient(handler), Microsoft.Extensions.Options.Options.Create(new GitHubOptions { ApiBaseUrl = "https://api.github.test", Token = "token" }));
+
+        var issue = await client.CreateIssueForCopilotAsync("title", "body", CancellationToken.None);
+
+        Assert.False(issue.CopilotAssigned);
+    }
+
+    [Theory]
     [InlineData("This closes #123", "copilot/test", 123)]
     [InlineData("Fixes #456\nReady", "copilot/test", 456)]
     [InlineData("No body issue", "copilot/issue-789-test", 789)]

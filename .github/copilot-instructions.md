@@ -90,5 +90,6 @@ All services are registered as singletons. `IGitHubClient` uses `AddHttpClient<>
 ## Copilot coding agent integration
 
 - Issues are dispatched to Copilot by assigning `copilot-swe-agent[bot]` via a user PAT (GitHub App tokens are not supported).
+- The same bot is reported under different logins depending on the API (`copilot-swe-agent` from GraphQL `suggestedActors`, `Copilot` on REST assignees, `app/copilot-swe-agent` on PR authors). Match it by node id where possible — never by a single hard-coded login.
 - Copilot PRs come from `copilot/` branches.
 - Re-engage Copilot via `@copilot` **PR comments** only (issue comments are ignored after assignment).
