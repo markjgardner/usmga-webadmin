@@ -11,6 +11,7 @@ public interface IGitHubClient
     Task<int?> GetLinkedIssueNumberForPullRequestAsync(int prNumber, CancellationToken cancellationToken);
     Task<CheckStatus> GetChecksAsync(string sha, CancellationToken cancellationToken);
     Task<MergeResult> MergePullRequestAsync(int prNumber, string expectedSha, CancellationToken cancellationToken);
+    Task MarkPullRequestReadyForReviewAsync(string nodeId, CancellationToken cancellationToken);
     Task PostCopilotPrCommentAsync(int prNumber, string text, CancellationToken cancellationToken);
 }
 

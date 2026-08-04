@@ -763,6 +763,7 @@ public sealed class ConversationTests
         public MergeResult MergeResponse { get; set; } = new(true, "merged");
         public int MergeCalls { get; private set; }
         public bool MergeCalled => MergeCalls > 0;
+        public int MarkReadyCalls { get; private set; }
         public string? ExpectedSha { get; private set; }
         public string? Comment { get; private set; }
         public int CreateIssueCalls { get; private set; }
@@ -789,6 +790,12 @@ public sealed class ConversationTests
             _mergeAttempted = true;
             ExpectedSha = expectedSha;
             return Task.FromResult(MergeResponse);
+        }
+
+        public Task MarkPullRequestReadyForReviewAsync(string nodeId, CancellationToken cancellationToken)
+        {
+            MarkReadyCalls++;
+            return Task.CompletedTask;
         }
 
         public Task PostCopilotPrCommentAsync(int prNumber, string text, CancellationToken cancellationToken)

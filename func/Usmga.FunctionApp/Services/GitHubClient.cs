@@ -122,7 +122,9 @@ public sealed class GitHubClient : IGitHubClient
             root.GetProperty("html_url").GetString() ?? string.Empty,
             root.TryGetProperty("body", out var body) ? body.GetString() ?? string.Empty : string.Empty,
             root.TryGetProperty("merged", out var merged) && merged.ValueKind == JsonValueKind.True,
-            root.TryGetProperty("state", out var state) && StringComparer.OrdinalIgnoreCase.Equals(state.GetString(), "closed"));
+            root.TryGetProperty("state", out var state) && StringComparer.OrdinalIgnoreCase.Equals(state.GetString(), "closed"),
+            root.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True,
+            root.TryGetProperty("node_id", out var nodeId) ? nodeId.GetString() ?? string.Empty : string.Empty);
     }
 
     public async Task<int?> GetLinkedIssueNumberForPullRequestAsync(int prNumber, CancellationToken cancellationToken)
@@ -235,6 +237,22 @@ public sealed class GitHubClient : IGitHubClient
         }
         using var doc = JsonDocument.Parse(body);
         return new MergeResult(doc.RootElement.TryGetProperty("merged", out var merged) && merged.GetBoolean(), doc.RootElement.GetProperty("message").GetString() ?? string.Empty);
+    }
+
+    public async Task MarkPullRequestReadyForReviewAsync(string nodeId, CancellationToken cancellationToken)
+    {
+        const string mutation = "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{isDraft}}}";
+        using var response = await _http.PostAsJsonAsync("graphql", new { query = mutation, variables = new { id = nodeId } }, JsonOptions, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Failed to mark pull request ready for review: {body}");
+        }
+        using var doc = JsonDocument.Parse(body);
+        if (doc.RootElement.TryGetProperty("errors", out var errors) && errors.ValueKind == JsonValueKind.Array && errors.GetArrayLength() > 0)
+        {
+            throw new InvalidOperationException($"Failed to mark pull request ready for review: {body}");
+        }
     }
 
     public async Task PostCopilotPrCommentAsync(int prNumber, string text, CancellationToken cancellationToken)

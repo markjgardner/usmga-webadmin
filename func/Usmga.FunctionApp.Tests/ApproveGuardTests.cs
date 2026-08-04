@@ -139,6 +139,7 @@ public sealed class ApproveGuardTests
         public GitHubPullRequest PullRequest { get; set; } = new(42, "sha", "copilot/test", "copilot-swe-agent[bot]", "url");
         public CheckStatus Checks { get; set; } = new(true, "success");
         public bool MergeCalled { get; private set; }
+        public bool MarkReadyCalled { get; private set; }
         public Task EnsureCopilotAssignableAsync(CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<GitHubIssue> CreateIssueForCopilotAsync(string title, string body, CancellationToken cancellationToken) => Task.FromResult(new GitHubIssue(1, "issue"));
         public Task<GitHubPullRequest?> FindPullRequestAsync(RequestRecord record, CancellationToken cancellationToken) => Task.FromResult<GitHubPullRequest?>(PullRequest);
@@ -149,6 +150,11 @@ public sealed class ApproveGuardTests
         {
             MergeCalled = true;
             return Task.FromResult(new MergeResult(true, "merged"));
+        }
+        public Task MarkPullRequestReadyForReviewAsync(string nodeId, CancellationToken cancellationToken)
+        {
+            MarkReadyCalled = true;
+            return Task.CompletedTask;
         }
         public Task PostCopilotPrCommentAsync(int prNumber, string text, CancellationToken cancellationToken) => Task.CompletedTask;
     }

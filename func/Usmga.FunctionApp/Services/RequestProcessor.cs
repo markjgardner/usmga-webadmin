@@ -473,6 +473,11 @@ public sealed class RequestProcessor
             return;
         }
 
+        if (pr.Draft)
+        {
+            await _gitHub.MarkPullRequestReadyForReviewAsync(pr.NodeId, cancellationToken);
+        }
+
         var merge = await _gitHub.MergePullRequestAsync(pr.Number, record.ReviewedSha!, cancellationToken);
         var merged = merge.Merged;
         var message = merge.Message;
