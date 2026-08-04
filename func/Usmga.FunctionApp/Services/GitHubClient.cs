@@ -13,6 +13,7 @@ public sealed class GitHubClient : IGitHubClient
 {
     private readonly HttpClient _http;
     private readonly GitHubOptions _options;
+    private string? _copilotNodeId;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Regex ClosingIssueReference = new(@"\b(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(?<number>\d+)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex BranchIssueReference = new(@"(?:^|[-_/])(?:issue|gh)?[-_/#]?(?<number>\d+)(?:$|[-_/])", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -40,8 +41,12 @@ public sealed class GitHubClient : IGitHubClient
         var nodes = doc.RootElement.GetProperty("data").GetProperty("repository").GetProperty("suggestedActors").GetProperty("nodes");
         foreach (var node in nodes.EnumerateArray())
         {
-            if (node.TryGetProperty("login", out var login) && StringComparer.OrdinalIgnoreCase.Equals(login.GetString(), _options.CopilotLogin))
+            if (node.TryGetProperty("login", out var login) && IsCopilotLogin(login.GetString()))
             {
+                if (node.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
+                {
+                    _copilotNodeId = id.GetString();
+                }
                 return;
             }
         }
@@ -59,7 +64,7 @@ public sealed class GitHubClient : IGitHubClient
         {
             foreach (var assignee in assignees.EnumerateArray())
             {
-                if (assignee.TryGetProperty("login", out var login) && IsCopilotLogin(login.GetString()))
+                if (IsCopilotActor(assignee))
                 {
                     assigned = true;
                     break;
@@ -248,7 +253,42 @@ public sealed class GitHubClient : IGitHubClient
     }
 
     private bool IsCopilotPr(GitHubPullRequest pr) => pr.HeadRef.StartsWith("copilot/", StringComparison.OrdinalIgnoreCase) && IsCopilotLogin(pr.AuthorLogin);
-    private bool IsCopilotLogin(string? login) => StringComparer.OrdinalIgnoreCase.Equals(login, _options.CopilotLogin) || StringComparer.OrdinalIgnoreCase.Equals(login, _options.CopilotAssignee);
+
+    // GitHub surfaces the same coding-agent bot under several logins depending on the API:
+    // "copilot-swe-agent" from GraphQL suggestedActors, "Copilot" on REST assignees, and
+    // "app/copilot-swe-agent" or a "[bot]" suffix elsewhere. Accept them all.
+    private bool IsCopilotLogin(string? login)
+    {
+        if (string.IsNullOrWhiteSpace(login)) return false;
+
+        var normalized = login.Trim();
+        if (normalized.StartsWith("app/", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized["app/".Length..];
+        }
+        if (normalized.EndsWith("[bot]", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[..^"[bot]".Length];
+        }
+
+        return StringComparer.OrdinalIgnoreCase.Equals(normalized, _options.CopilotLogin)
+            || StringComparer.OrdinalIgnoreCase.Equals(normalized, _options.CopilotAssignee)
+            || StringComparer.OrdinalIgnoreCase.Equals(normalized, "copilot");
+    }
+
+    /// <summary>Prefers the bot node id, which is stable across the logins GitHub reports.</summary>
+    private bool IsCopilotActor(JsonElement actor)
+    {
+        if (_copilotNodeId is not null
+            && actor.TryGetProperty("node_id", out var nodeId)
+            && nodeId.ValueKind == JsonValueKind.String
+            && string.Equals(nodeId.GetString(), _copilotNodeId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return actor.TryGetProperty("login", out var login) && IsCopilotLogin(login.GetString());
+    }
     private static bool IsPassingCheckRunConclusion(string conclusion) => conclusion.Equals("success", StringComparison.OrdinalIgnoreCase) || conclusion.Equals("neutral", StringComparison.OrdinalIgnoreCase) || conclusion.Equals("skipped", StringComparison.OrdinalIgnoreCase);
     private string RepoPath(string path) => $"repos/{_options.Owner}/{_options.Repo}/{path}";
 
