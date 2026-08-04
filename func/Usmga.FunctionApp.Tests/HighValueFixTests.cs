@@ -75,18 +75,6 @@ public sealed class HighValueFixTests
         Assert.Contains("not found for this chat", sms.Messages.Single().Message);
     }
 
-    [Fact]
-    public void MalformedApproveClassifiesAsInvalid()
-    {
-        var telegramOptions = Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111" });
-        var classifier = new MessageClassifier(telegramOptions);
-
-        var command = classifier.Classify("APPROVE abc123");
-
-        Assert.Equal(InboundCommandKind.Invalid, command.Kind);
-        Assert.Contains("APPROVE <code> <approval-nonce>", command.Text);
-    }
-
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData("wrong", HttpStatusCode.Unauthorized)]
@@ -223,7 +211,7 @@ public sealed class HighValueFixTests
     private static RequestProcessor NewProcessor(FakeGitHubClient github, FakeSmsClient sms, InMemoryStateStore state)
     {
         var telegramOptions = Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111,222222222" });
-        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(telegramOptions), telegramOptions, NullLogger<RequestProcessor>.Instance);
+        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(telegramOptions), new RuleBasedIntentClassifier(), telegramOptions, NullLogger<RequestProcessor>.Instance);
     }
 
     private static NotifyRequester NewNotifyRequester(string sharedSecret)
@@ -243,12 +231,30 @@ public sealed class HighValueFixTests
 
     private sealed class FakeSmsClient : IMessageChannel
     {
+        private long _nextMessageId = 1000;
+
         public List<(string To, string Message)> Messages { get; } = new();
-        public Task SendAsync(string to, string message, CancellationToken cancellationToken)
+        public List<(string To, string Message, IReadOnlyList<MessageButton> Buttons)> ButtonMessages { get; } = new();
+        public List<(string ChatId, long MessageId)> Cleared { get; } = new();
+
+        public Task<long?> SendAsync(string to, string message, IReadOnlyList<MessageButton>? buttons, CancellationToken cancellationToken)
         {
             Messages.Add((to, message));
+            if (buttons is { Count: > 0 })
+            {
+                ButtonMessages.Add((to, message, buttons));
+            }
+
+            return Task.FromResult<long?>(_nextMessageId++);
+        }
+
+        public Task ClearButtonsAsync(string chatId, long messageId, CancellationToken cancellationToken)
+        {
+            Cleared.Add((chatId, messageId));
             return Task.CompletedTask;
         }
+
+        public Task AcknowledgeAsync(string callbackQueryId, string? text, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeGitHubClient : IGitHubClient

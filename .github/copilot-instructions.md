@@ -32,10 +32,22 @@ Three independent stacks share this repo:
 
 The function app has two thin entry-point functions that delegate to a service layer:
 
-- **TelegramInbound** (HTTP trigger, `POST /api/telegram/webhook`) — receives Telegram Bot webhooks, validates the `X-Telegram-Bot-Api-Secret-Token` header against the configured webhook secret in constant time, deduplicates updates (claim/complete/release pattern), classifies the message, and dispatches to `RequestProcessor`.
+- **TelegramInbound** (HTTP trigger, `POST /api/telegram/webhook`) — receives Telegram Bot webhooks, validates the `X-Telegram-Bot-Api-Secret-Token` header against the configured webhook secret in constant time, deduplicates updates (claim/complete/release pattern), enforces the user allowlist, and dispatches to `RequestProcessor`. Handles both `message` and `callback_query` updates; **both paths enforce the allowlist**, since a callback query carries its own `from`.
 - **NotifyRequester** (HTTP trigger) — receives GitHub Actions callbacks with preview URLs; validates a shared secret header before sending Telegram replies.
 
 Core orchestration lives in `RequestProcessor`, which handles new requests (creates GitHub issues + assigns Copilot), approvals (merges PRs with SHA + status checks guard), and change requests (`@copilot` PR comments).
+
+### Conversational layer
+
+The bot infers intent and target from state rather than requiring codes and nonces:
+
+- `IIntentClassifier` (`RuleBasedIntentClassifier`) maps a message + `ConversationContext` to an `IntentResult`. It is an interface so an LLM-backed implementation can replace it without touching callers.
+- `ConversationContext` is built from `IStateStore.ListActiveForChatAsync` plus the message the user replied to — Telegram bots cannot read chat history, so "context" is persisted state, not inference.
+- Resolution order: replied-to preview → the only approvable request → the only active request → ask which (never guess).
+- **Precision guard:** an approval phrase only fires if the message reduces to *exactly* that phrase after filler removal (`MatchesAny`/`IsPhraseCover` in `IntentClassifier.cs`). "Looks good but make the logo bigger" must route to `Changes`. Any new phrase added to the lists needs a matching `[InlineData]` case in `ConversationTests`.
+- `IntentConfidence.Medium` approvals ("ok", "nice") set `AwaitingConfirmationUntil` and prompt before merging; `IntentKind.Decline` ("not yet") clears that flag **without** cancelling, unlike `IntentKind.Cancel`.
+- The approval nonce is still required to *exist* and be unexpired (`RequestRecord.IsApprovable()`) — it is simply never retyped. Buttons carry it in `callback_data` (`CallbackAction`, 64-byte cap).
+- The webhook must be registered with `allowed_updates=["message","callback_query"]` (`scripts/register-telegram-webhook.sh`); otherwise Telegram silently drops button taps.
 
 ### DI and configuration
 
@@ -65,6 +77,7 @@ All services are registered as singletons. `IGitHubClient` uses `AddHttpClient<>
 - xUnit with `[Fact]` / `[Theory]` + `[InlineData]`.
 - No mocking framework; tests use `InMemoryStateStore` and simple fakes.
 - Test files are named `{Feature}Tests.cs` (e.g., `ClassifierTests.cs`, `ApproveGuardTests.cs`).
+- `MessageClassifier` covers chat policy only (allowlist, attachment hints); message *parsing* belongs to `RuleBasedIntentClassifier`.
 
 ### Site
 

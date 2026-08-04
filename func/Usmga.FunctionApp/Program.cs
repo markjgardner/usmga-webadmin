@@ -13,6 +13,7 @@ var host = new HostBuilder()
         services.Configure<NotifyOptions>(context.Configuration.GetSection("Notify"));
         services.AddSingleton<ITokenGenerator, SecureTokenGenerator>();
         services.AddSingleton<MessageClassifier>();
+        services.AddSingleton<IIntentClassifier, RuleBasedIntentClassifier>();
         services.AddSingleton<IStateStore, TableStateStore>();
         services.AddHttpClient<IMessageChannel, TelegramClient>();
         services.AddHttpClient<IGitHubClient, GitHubClient>();

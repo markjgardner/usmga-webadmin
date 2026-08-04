@@ -11,6 +11,10 @@ public sealed class TableStateStore : IStateStore
     private const string RequestPartition = "request";
     private const string MessagePartition = "message";
     private const string UploadPartition = "upload";
+
+    /// <summary>How far back <see cref="ListActiveForChatAsync"/> looks for in-flight work.</summary>
+    private static readonly TimeSpan ActiveWindow = TimeSpan.FromDays(30);
+
     private readonly TableClient _table;
     private readonly ITokenGenerator _tokens;
 
@@ -92,6 +96,33 @@ public sealed class TableStateStore : IStateStore
         return null;
     }
 
+    public async Task<IReadOnlyList<RequestRecord>> ListActiveForChatAsync(string chatId, CancellationToken cancellationToken)
+    {
+        // Bounded by a recency window so this can never degrade into a full-table scan as
+        // history accumulates. Anything older than the window is not conversationally
+        // "in flight" anyway, and the approval nonce would have expired long before.
+        var since = DateTimeOffset.UtcNow - ActiveWindow;
+        var filter = $"PartitionKey eq '{RequestPartition}' and RequesterChatId eq '{Sanitize(chatId)}' and UpdatedAt gt datetime'{since:yyyy-MM-ddTHH:mm:ssZ}'";
+
+        var records = new List<RequestRecord>();
+        await foreach (var entity in _table.QueryAsync<TableEntity>(filter, cancellationToken: cancellationToken))
+        {
+            var record = FromEntity(entity);
+            if (!RequestStatus.IsTerminal(record.Status))
+            {
+                records.Add(record);
+            }
+        }
+
+        return records.OrderByDescending(r => r.UpdatedAt).ToArray();
+    }
+
+    /// <summary>
+    /// Escapes single quotes so a chat id cannot break out of the OData string literal.
+    /// Chat ids are numeric in practice; this is defence in depth.
+    /// </summary>
+    private static string Sanitize(string value) => value.Replace("'", "''");
+
     public async Task SaveRequestAsync(RequestRecord record, CancellationToken cancellationToken)
     {
         record.UpdatedAt = DateTimeOffset.UtcNow;
@@ -131,6 +162,8 @@ public sealed class TableStateStore : IStateStore
         SetNullable(entity, "DeployedSha", record.DeployedSha);
         SetNullable(entity, "ApprovalNonce", record.ApprovalNonce);
         SetNullable(entity, "ApprovalNonceExpiresAt", record.ApprovalNonceExpiresAt);
+        SetNullable(entity, "PreviewMessageId", record.PreviewMessageId);
+        SetNullable(entity, "AwaitingConfirmationUntil", record.AwaitingConfirmationUntil);
         SetNullable(entity, "LastError", record.LastError);
         return entity;
     }
@@ -149,6 +182,8 @@ public sealed class TableStateStore : IStateStore
         DeployedSha = entity.GetString("DeployedSha"),
         ApprovalNonce = entity.GetString("ApprovalNonce"),
         ApprovalNonceExpiresAt = entity.TryGetValue("ApprovalNonceExpiresAt", out var expires) ? (DateTimeOffset?)expires : null,
+        PreviewMessageId = entity.TryGetValue("PreviewMessageId", out var previewMessage) ? Convert.ToInt64(previewMessage) : null,
+        AwaitingConfirmationUntil = entity.TryGetValue("AwaitingConfirmationUntil", out var awaiting) ? (DateTimeOffset?)awaiting : null,
         CreatedAt = entity.TryGetValue("CreatedAt", out var created) ? (DateTimeOffset)created : DateTimeOffset.UtcNow,
         UpdatedAt = entity.TryGetValue("UpdatedAt", out var updated) ? (DateTimeOffset)updated : DateTimeOffset.UtcNow,
         LastError = entity.GetString("LastError")

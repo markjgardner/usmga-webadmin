@@ -62,12 +62,25 @@ public sealed class TelegramInbound
         }
 
         var message = update?.Message;
-        if (message is null || string.IsNullOrWhiteSpace(message.Text) || message.From is null || message.Chat is null)
+        var callback = update?.CallbackQuery;
+
+        if (message is null && callback is null)
         {
             return req.CreateResponse(HttpStatusCode.OK);
         }
 
         var updateId = update!.UpdateId.ToString();
+
+        if (callback is not null)
+        {
+            return await HandleCallbackAsync(req, callback, updateId, cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(message!.Text) || message.From is null || message.Chat is null)
+        {
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
         var userId = message.From.Id.ToString();
         var chatId = message.Chat.Id.ToString();
 
@@ -86,28 +99,58 @@ public sealed class TelegramInbound
                 return req.CreateResponse(HttpStatusCode.OK);
             }
 
-            var command = _classifier.Classify(message.Text);
-            switch (command.Kind)
-            {
-                case InboundCommandKind.Approve:
-                    await _processor.HandleApproveAsync(chatId, command.Code!, command.ApprovalNonce!, cancellationToken);
-                    break;
-                case InboundCommandKind.Changes:
-                    await _processor.HandleChangesAsync(chatId, command.Code!, command.Text, cancellationToken);
-                    break;
-                case InboundCommandKind.Invalid:
-                    await _channel.SendAsync(chatId, command.Text, cancellationToken);
-                    break;
-                default:
-                    await _processor.HandleNewRequestAsync(chatId, command.Text, cancellationToken);
-                    break;
-            }
+            await _processor.HandleMessageAsync(chatId, message.Text, message.ReplyToMessage?.MessageId, cancellationToken);
 
             await _state.CompleteMessageAsync(updateId, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Telegram update {UpdateId} failed; releasing idempotency claim for retry", updateId);
+            await _state.ReleaseMessageAsync(updateId, cancellationToken);
+            throw;
+        }
+
+        return req.CreateResponse(HttpStatusCode.OK);
+    }
+
+    /// <summary>Handles an inline keyboard tap.</summary>
+    /// <remarks>
+    /// This is a second, independent path into the merge logic, so it must repeat every
+    /// authorization check the message path performs — in particular the allowlist. A
+    /// callback query carries its own <c>from</c>, which is not necessarily the chat owner.
+    /// </remarks>
+    private async Task<HttpResponseData> HandleCallbackAsync(HttpRequestData req, TelegramCallbackQuery callback, string updateId, CancellationToken cancellationToken)
+    {
+        var chat = callback.Message?.Chat;
+        if (callback.From is null || chat is null)
+        {
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
+        var userId = callback.From.Id.ToString();
+        var chatId = chat.Id.ToString();
+
+        if (!_classifier.IsAllowed(userId))
+        {
+            _logger.LogWarning("Rejected callback query from non-allowlisted user {UserId}", userId);
+            await _channel.AcknowledgeAsync(callback.Id, "Not authorized.", cancellationToken);
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
+        if (!await _state.TryClaimMessageAsync(updateId, cancellationToken))
+        {
+            _logger.LogInformation("Ignoring duplicate or in-flight Telegram callback {UpdateId}", updateId);
+            return req.CreateResponse(HttpStatusCode.OK);
+        }
+
+        try
+        {
+            await _processor.HandleCallbackAsync(chatId, callback.Id, callback.Data, callback.Message?.MessageId, cancellationToken);
+            await _state.CompleteMessageAsync(updateId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Telegram callback {UpdateId} failed; releasing idempotency claim for retry", updateId);
             await _state.ReleaseMessageAsync(updateId, cancellationToken);
             throw;
         }
