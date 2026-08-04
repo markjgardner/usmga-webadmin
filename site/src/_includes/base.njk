@@ -28,7 +28,7 @@
   </header>
 
   <main>
-    <section class="hero{% if hero %} hero-image{% endif %}"{% if hero %} style="--hero-image: url('{{ hero }}')"{% endif %}>
+    <section class="hero{% if hero %} hero-image{% endif %}"{% if hero %} style="--hero-image: url('{{ hero }}');{% if heroPosition %} --hero-position: {{ heroPosition }};{% endif %}{% if heroHeight %} --hero-height: {{ heroHeight }};{% endif %}"{% elif heroHeight %} style="--hero-height: {{ heroHeight }}"{% endif %}>
       <div class="hero-inner">
         <p class="eyebrow">United States Mounted Games Association</p>
         <h1>{{ heading or title }}</h1>
@@ -43,5 +43,6 @@
     <p><strong>USMGA</strong> · Founded 1986</p>
     <p><a href="https://www.facebook.com/share/g/1LcYjq6xzp/?mibextid=wwXIfr">Facebook</a> · <a href="https://www.instagram.com/usmga.official?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==">Instagram</a></p>
   </footer>
+  <script src="/assets/js/slideshow.js" defer></script>
 </body>
 </html>
