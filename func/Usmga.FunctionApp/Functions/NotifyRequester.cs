@@ -39,7 +39,12 @@ public sealed class NotifyRequester
             return bad;
         }
 
-        await _processor.NotifyPreviewAsync(notify, cancellationToken);
+        var notified = await _processor.NotifyPreviewAsync(notify, cancellationToken);
+        if (!notified)
+        {
+            return request.CreateResponse(HttpStatusCode.NoContent);
+        }
+
         var ok = request.CreateResponse(HttpStatusCode.OK);
         await ok.WriteStringAsync("notified", cancellationToken);
         return ok;

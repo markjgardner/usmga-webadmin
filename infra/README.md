@@ -1,6 +1,6 @@
 # Infrastructure
 
-Azure Bicep for the SMS-driven website-change pipeline. All files live under `infra/`.
+Azure Bicep for the Telegram-driven website-change pipeline. All files live under `infra/`.
 
 ## What is deployed
 
@@ -10,7 +10,7 @@ Azure Bicep for the SMS-driven website-change pipeline. All files live under `in
 - Log Analytics workspace and Application Insights.
 - Key Vault with RBAC enabled, plus `Key Vault Secrets User` granted to the Function App managed identity.
 
-No secrets are hardcoded. Twilio credentials and other secrets must be stored in Key Vault; Static Web Apps deployment tokens are retrieved at deploy/operation time.
+No secrets are hardcoded. Telegram credentials and other secrets must be stored in Key Vault; Static Web Apps deployment tokens are retrieved at deploy/operation time.
 
 ## Layout
 
@@ -28,16 +28,16 @@ No secrets are hardcoded. Twilio credentials and other secrets must be stored in
 - Azure CLI with Bicep (`az bicep version`).
 - An Azure subscription and resource group.
 - Permission to create the listed resources and role assignments.
-- A Twilio account with a phone number provisioned for SMS.
+- A Telegram bot created with BotFather.
 
 ## Manual steps
 
-1. **Twilio phone number:** purchase an SMS-capable phone number in the Twilio console. Configure its inbound SMS webhook URL to `https://<function-app>.azurewebsites.net/api/sms/inbound?code=<function-key>`.
-2. **Twilio Account SID:** create the Key Vault secret named by `twilioAccountSidSecretName` (default `twilio-account-sid`). The function reads it as `Twilio__AccountSid`.
-3. **Twilio Auth Token:** create the Key Vault secret named by `twilioAuthTokenSecretName` (default `twilio-auth-token`). The function reads it as `Twilio__AuthToken`.
+1. **Telegram bot token:** create a Telegram bot with BotFather and store its token in the Key Vault secret named by `telegramBotTokenSecretName` (default `telegram-bot-token`). The function reads it as `Telegram__BotToken`.
+2. **Telegram webhook secret:** create a random secret token, store it in the Key Vault secret named by `telegramWebhookSecretName` (default `telegram-webhook-secret`), and register it with Telegram `setWebhook`. Telegram sends it on the `X-Telegram-Bot-Api-Secret-Token` header, and the function reads it as `Telegram__WebhookSecret`.
+3. **Telegram webhook URL:** configure the Telegram webhook URL to `https://<function-app>.azurewebsites.net/api/telegram/webhook?code=<function-key>`.
 4. **GitHub credential:** create a GitHub PAT or GitHub App credential with least privilege to open issues and, later, merge PRs. Store it in the Key Vault secret named by `githubCredentialSecretName` (default `github-credential`). The function reads it as `GitHub__Token`.
 5. **Notify shared secret:** create the Key Vault secret named by `notifySharedSecretName` (default `notify-shared-secret`) with a random value, and set the same value as the `NOTIFY_SHARED_SECRET` GitHub Actions secret so the preview workflow can authenticate to `NotifyRequester`.
-6. **Twilio From number and allowlist:** pass `twilioFromNumber` (the Twilio E.164 number) and `smsAllowlist` (comma-separated E.164 numbers permitted to submit requests) as deployment parameters. They become the `Twilio__FromNumber` and `Twilio__Allowlist` app settings.
+6. **Telegram allowlist:** pass `telegramAllowlist` (comma-separated Telegram numeric user IDs permitted to submit requests) as a deployment parameter. It becomes the `Telegram__Allowlist` app setting.
 7. **Static Web Apps GitHub link:** connect the Static Web App to this GitHub repository/workflow. Retrieve the SWA deployment token via Azure CLI/API when configuring workflows; do not commit it.
 
 ## Deploy
@@ -67,7 +67,7 @@ az deployment group create \
   --resource-group <resource-group> \
   --template-file infra/main.bicep \
   --parameters @infra/main.parameters.json \
-  --parameters environmentName=prod tags='{"project":"usmga-webadmin","environment":"prod","workload":"sms-website-change-pipeline","managedBy":"bicep"}'
+  --parameters environmentName=prod tags='{"project":"usmga-webadmin","environment":"prod","workload":"telegram-website-change-pipeline","managedBy":"bicep"}'
 ```
 
 ## Useful outputs for workflows and operations

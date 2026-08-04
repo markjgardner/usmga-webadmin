@@ -4,8 +4,8 @@ param location string
 @description('Globally unique storage account name, 3-24 lowercase letters and numbers.')
 param name string
 
-@description('Name of the table used for SMS/GitHub correlation state.')
-param correlationTableName string = 'SmsCorrelation'
+@description('Name of the table used for Telegram/GitHub correlation state.')
+param correlationTableName string = 'TelegramCorrelation'
 
 @description('Tags to apply to the resource.')
 param tags object = {}

@@ -17,20 +17,23 @@
     "githubCredentialSecretName": {
       "value": "github-credential"
     },
-    "twilioAccountSidSecretName": {
-      "value": "twilio-account-sid"
+    "telegramBotTokenSecretName": {
+      "value": "telegram-bot-token"
     },
-    "twilioAuthTokenSecretName": {
-      "value": "twilio-auth-token"
+    "telegramWebhookSecretName": {
+      "value": "telegram-webhook-secret"
+    },
+    "telegramAllowlist": {
+      "value": ""
     },
     "correlationTableName": {
-      "value": "SmsCorrelation"
+      "value": "TelegramCorrelation"
     },
     "tags": {
       "value": {
         "project": "usmga-webadmin",
         "environment": "test",
-        "workload": "sms-website-change-pipeline",
+        "workload": "telegram-website-change-pipeline",
         "managedBy": "bicep"
       }
     }

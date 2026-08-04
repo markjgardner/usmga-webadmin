@@ -28,14 +28,26 @@ Three independent stacks share this repo:
 | `func/` | C# .NET 8 isolated Azure Functions v4 | `func/Usmga.FunctionApp/Program.cs` |
 | `infra/` | Bicep modules | `infra/main.bicep` orchestrates all modules |
 
-### SMS → Copilot pipeline (func/)
+### Telegram → Copilot pipeline (func/)
 
 The function app has two thin entry-point functions that delegate to a service layer:
 
-- **SmsInbound** (HTTP trigger, `POST /api/sms/inbound`) — receives Twilio inbound SMS webhooks, validates the Twilio request signature, deduplicates on `MessageSid` (claim/complete/release pattern), classifies the message, and dispatches to `RequestProcessor`.
-- **NotifyRequester** (HTTP trigger) — receives GitHub Actions callbacks with preview URLs; validates a shared secret header before sending SMS replies.
+- **TelegramInbound** (HTTP trigger, `POST /api/telegram/webhook`) — receives Telegram Bot webhooks, validates the `X-Telegram-Bot-Api-Secret-Token` header against the configured webhook secret in constant time, deduplicates updates (claim/complete/release pattern), enforces the user allowlist, and dispatches to `RequestProcessor`. Handles both `message` and `callback_query` updates; **both paths enforce the allowlist**, since a callback query carries its own `from`.
+- **NotifyRequester** (HTTP trigger) — receives GitHub Actions callbacks with preview URLs; validates a shared secret header before sending Telegram replies.
 
 Core orchestration lives in `RequestProcessor`, which handles new requests (creates GitHub issues + assigns Copilot), approvals (merges PRs with SHA + status checks guard), and change requests (`@copilot` PR comments).
+
+### Conversational layer
+
+The bot infers intent and target from state rather than requiring codes and nonces:
+
+- `IIntentClassifier` (`RuleBasedIntentClassifier`) maps a message + `ConversationContext` to an `IntentResult`. It is an interface so an LLM-backed implementation can replace it without touching callers.
+- `ConversationContext` is built from `IStateStore.ListActiveForChatAsync` plus the message the user replied to — Telegram bots cannot read chat history, so "context" is persisted state, not inference.
+- Resolution order: replied-to preview → the only approvable request → the only active request → ask which (never guess).
+- **Precision guard:** an approval phrase only fires if the message reduces to *exactly* that phrase after filler removal (`MatchesAny`/`IsPhraseCover` in `IntentClassifier.cs`). "Looks good but make the logo bigger" must route to `Changes`. Any new phrase added to the lists needs a matching `[InlineData]` case in `ConversationTests`.
+- `IntentConfidence.Medium` approvals ("ok", "nice") set `AwaitingConfirmationUntil` and prompt before merging; `IntentKind.Decline` ("not yet") clears that flag **without** cancelling, unlike `IntentKind.Cancel`.
+- The approval nonce is still required to *exist* and be unexpired (`RequestRecord.IsApprovable()`) — it is simply never retyped. Buttons carry it in `callback_data` (`CallbackAction`, 64-byte cap).
+- The webhook must be registered with `allowed_updates=["message","callback_query"]` (`scripts/register-telegram-webhook.sh`); otherwise Telegram silently drops button taps.
 
 ### DI and configuration
 
@@ -44,7 +56,7 @@ Core orchestration lives in `RequestProcessor`, which handles new requests (crea
 | Section | Env var prefix | Source |
 |---------|---------------|--------|
 | `GitHub` | `GitHub__` | Key Vault reference |
-| `Twilio` | `Twilio__` | Key Vault (AccountSid, AuthToken) + app settings (FromNumber, Allowlist) |
+| `Telegram` | `Telegram__` | Key Vault (BotToken, WebhookSecret) + app settings (Allowlist, UploadBaseUrl) |
 | `Storage` | `Storage__` | App setting (connection string + table name) |
 | `Notify` | `Notify__` | Key Vault reference |
 
@@ -65,6 +77,7 @@ All services are registered as singletons. `IGitHubClient` uses `AddHttpClient<>
 - xUnit with `[Fact]` / `[Theory]` + `[InlineData]`.
 - No mocking framework; tests use `InMemoryStateStore` and simple fakes.
 - Test files are named `{Feature}Tests.cs` (e.g., `ClassifierTests.cs`, `ApproveGuardTests.cs`).
+- `MessageClassifier` covers chat policy only (allowlist, attachment hints); message *parsing* belongs to `RuleBasedIntentClassifier`.
 
 ### Site
 
@@ -76,19 +89,20 @@ All services are registered as singletons. `IGitHubClient` uses `AddHttpClient<>
 
 - Bicep modules under `infra/modules/`; the orchestrator is `infra/main.bicep`.
 - App settings requiring secrets use Key Vault references (`@Microsoft.KeyVault(SecretUri=...)`).
-- Twilio credentials (Account SID + Auth Token) are stored in Key Vault; phone number and allowlist are plain app settings.
+- Telegram credentials (`telegram-bot-token` + `telegram-webhook-secret`) are stored in Key Vault; numeric user ID allowlist and upload base URL are plain app settings.
 
 ## CI/CD workflows
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | `ci.yml` | PR (any path) | Build validation: site + func + Bicep |
-| `site-preview.yml` | PR (`site/**`) | Deploy SWA preview + SMS notification |
+| `site-preview.yml` | PR (`site/**`) | Deploy SWA preview + Telegram notification |
 | `site-prod.yml` | Push to main (`site/**`) | Deploy SWA production |
 | `func-deploy.yml` | Push to main (`func/**`) | Build, test, publish function app |
 
 ## Copilot coding agent integration
 
 - Issues are dispatched to Copilot by assigning `copilot-swe-agent[bot]` via a user PAT (GitHub App tokens are not supported).
+- The same bot is reported under different logins depending on the API (`copilot-swe-agent` from GraphQL `suggestedActors`, `Copilot` on REST assignees, `app/copilot-swe-agent` on PR authors). Match it by node id where possible — never by a single hard-coded login.
 - Copilot PRs come from `copilot/` branches.
 - Re-engage Copilot via `@copilot` **PR comments** only (issue comments are ignored after assignment).

@@ -38,22 +38,34 @@ internal sealed class InMemoryStateStore : IStateStore
         return Task.CompletedTask;
     }
 
-    public Task<string> CreateUploadTokenAsync(string code, string requesterPhone, CancellationToken cancellationToken) => Task.FromResult("upload-token");
+    public Task<string> CreateUploadTokenAsync(string code, string requesterChatId, CancellationToken cancellationToken) => Task.FromResult("upload-token");
+
+    public Task<IReadOnlyList<RequestRecord>> ListActiveForChatAsync(string chatId, CancellationToken cancellationToken)
+    {
+        var active = _records.Values
+            .Where(r => string.Equals(r.RequesterChatId, chatId, StringComparison.Ordinal) && !RequestStatus.IsTerminal(r.Status))
+            .OrderByDescending(r => r.UpdatedAt)
+            .Select(Clone)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<RequestRecord>>(active);
+    }
 
     private static RequestRecord Clone(RequestRecord r) => new()
     {
         Code = r.Code,
         CorrelationNonce = r.CorrelationNonce,
-        RequesterPhone = r.RequesterPhone,
+        RequesterChatId = r.RequesterChatId,
         OriginalMessage = r.OriginalMessage,
         Status = r.Status,
         IssueNumber = r.IssueNumber,
         PrNumber = r.PrNumber,
         PreviewUrl = r.PreviewUrl,
+        PreviewMessageId = r.PreviewMessageId,
         ReviewedSha = r.ReviewedSha,
         DeployedSha = r.DeployedSha,
         ApprovalNonce = r.ApprovalNonce,
         ApprovalNonceExpiresAt = r.ApprovalNonceExpiresAt,
+        AwaitingConfirmationUntil = r.AwaitingConfirmationUntil,
         CreatedAt = r.CreatedAt,
         UpdatedAt = r.UpdatedAt,
         LastError = r.LastError

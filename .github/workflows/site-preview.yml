@@ -49,8 +49,7 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
-          app_location: site
-          output_location: _site
+          app_location: site/_site
           skip_app_build: true
 
       - name: Notify requester of preview URL
@@ -64,11 +63,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${NOTIFY_FUNCTION_URL}" ] || [ -z "${NOTIFY_SHARED_SECRET}" ]; then
-            echo "NotifyRequester secrets are not configured; skipping SMS notification."
+            echo "NotifyRequester secrets are not configured; skipping Telegram notification."
             exit 0
           fi
           if [ -z "${PREVIEW_URL}" ]; then
-            echo "Static Web Apps deploy did not expose static_web_app_url; skipping SMS notification."
+            echo "Static Web Apps deploy did not expose static_web_app_url; skipping Telegram notification."
             exit 0
           fi
           payload=$(jq -n \
@@ -87,4 +86,8 @@ jobs:
             echo "Failing the job so the missing requester notification is visible and can be retried by re-running the workflow."
             exit 1
           fi
-          echo "NotifyRequester accepted preview notification for PR #${PR_NUMBER}."
+          if [ "${status}" = "204" ]; then
+            echo "PR #${PR_NUMBER} has no originating request, so no requester was notified."
+          else
+            echo "NotifyRequester accepted preview notification for PR #${PR_NUMBER}."
+          fi

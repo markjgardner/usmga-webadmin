@@ -8,13 +8,14 @@ var host = new HostBuilder()
     .ConfigureServices((context, services) =>
     {
         services.Configure<GitHubOptions>(context.Configuration.GetSection("GitHub"));
-        services.Configure<TwilioOptions>(context.Configuration.GetSection("Twilio"));
+        services.Configure<TelegramOptions>(context.Configuration.GetSection("Telegram"));
         services.Configure<StorageOptions>(context.Configuration.GetSection("Storage"));
         services.Configure<NotifyOptions>(context.Configuration.GetSection("Notify"));
         services.AddSingleton<ITokenGenerator, SecureTokenGenerator>();
         services.AddSingleton<MessageClassifier>();
+        services.AddSingleton<IIntentClassifier, RuleBasedIntentClassifier>();
         services.AddSingleton<IStateStore, TableStateStore>();
-        services.AddSingleton<ISmsClient, TwilioSmsClient>();
+        services.AddHttpClient<IMessageChannel, TelegramClient>();
         services.AddHttpClient<IGitHubClient, GitHubClient>();
         services.AddSingleton<RequestProcessor>();
     })

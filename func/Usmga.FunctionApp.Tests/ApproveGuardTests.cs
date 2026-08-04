@@ -16,7 +16,7 @@ public sealed class ApproveGuardTests
         {
             Code = "ABC123",
             CorrelationNonce = "corr",
-            RequesterPhone = "+15550000001",
+            RequesterChatId = "111111111",
             Status = RequestStatus.PreviewDeployed,
             PrNumber = 42,
             ReviewedSha = "reviewed-sha",
@@ -27,7 +27,7 @@ public sealed class ApproveGuardTests
         var sms = new FakeSmsClient();
         var processor = NewProcessor(github, sms, state);
 
-        await processor.HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+        await processor.HandleApproveAsync("111111111", "ABC123", "nonce", CancellationToken.None);
 
         var saved = await state.GetByCodeAsync("ABC123", CancellationToken.None);
         Assert.Equal(RequestStatus.Stale, saved!.Status);
@@ -43,7 +43,7 @@ public sealed class ApproveGuardTests
         {
             Code = "ABC123",
             CorrelationNonce = "corr",
-            RequesterPhone = "+15550000001",
+            RequesterChatId = "111111111",
             Status = RequestStatus.PreviewDeployed,
             PrNumber = 42,
             ReviewedSha = "reviewed-sha",
@@ -54,7 +54,7 @@ public sealed class ApproveGuardTests
         var sms = new FakeSmsClient();
         var processor = NewProcessor(github, sms, state);
 
-        await processor.HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+        await processor.HandleApproveAsync("111111111", "ABC123", "nonce", CancellationToken.None);
 
         var saved = await state.GetByCodeAsync("ABC123", CancellationToken.None);
         Assert.Equal(RequestStatus.PreviewDeployed, saved!.Status);
@@ -70,7 +70,7 @@ public sealed class ApproveGuardTests
         {
             Code = "ABC123",
             CorrelationNonce = "corr",
-            RequesterPhone = "+15550000001",
+            RequesterChatId = "111111111",
             Status = RequestStatus.PreviewDeployed,
             PrNumber = 42,
             ReviewedSha = "reviewed-sha",
@@ -81,7 +81,7 @@ public sealed class ApproveGuardTests
         var sms = new FakeSmsClient();
         var processor = NewProcessor(github, sms, state);
 
-        await processor.HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+        await processor.HandleApproveAsync("111111111", "ABC123", "nonce", CancellationToken.None);
 
         var saved = await state.GetByCodeAsync("ABC123", CancellationToken.None);
         Assert.Equal(RequestStatus.Stale, saved!.Status);
@@ -90,14 +90,14 @@ public sealed class ApproveGuardTests
     }
 
     [Theory]
-    [InlineData("+15550000002", "nonce")]
-    [InlineData("+15550000001", "wrong")]
-    public void ApprovalNonceValidationRequiresBoundPhoneAndNonce(string from, string nonce)
+    [InlineData("222222222", "nonce")]
+    [InlineData("111111111", "wrong")]
+    public void ApprovalNonceValidationRequiresBoundChatAndNonce(string from, string nonce)
     {
         var processor = NewProcessor(new FakeGitHubClient(), new FakeSmsClient(), new InMemoryStateStore());
         var record = new RequestRecord
         {
-            RequesterPhone = "+15550000001",
+            RequesterChatId = "111111111",
             ApprovalNonce = "nonce",
             ApprovalNonceExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5)
         };
@@ -105,10 +105,10 @@ public sealed class ApproveGuardTests
         Assert.False(processor.ApprovalNonceValid(record, from, nonce));
     }
 
-    private static RequestProcessor NewProcessor(IGitHubClient github, ISmsClient sms, IStateStore state)
+    private static RequestProcessor NewProcessor(IGitHubClient github, IMessageChannel sms, IStateStore state)
     {
-        var twilioOptions = Microsoft.Extensions.Options.Options.Create(new TwilioOptions { Allowlist = "+15550000001" });
-        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(twilioOptions), twilioOptions, NullLogger<RequestProcessor>.Instance);
+        var telegramOptions = Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111" });
+        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(telegramOptions), new RuleBasedIntentClassifier(), telegramOptions, NullLogger<RequestProcessor>.Instance);
     }
 
     private sealed class FakeTokens : ITokenGenerator
@@ -117,14 +117,21 @@ public sealed class ApproveGuardTests
         public string NewNonce(int bytes = 16) => "fixed-nonce";
     }
 
-    private sealed class FakeSmsClient : ISmsClient
+    private sealed class FakeSmsClient : IMessageChannel
     {
+        private long _nextMessageId = 1000;
+
         public List<string> Messages { get; } = new();
-        public Task SendAsync(string to, string message, CancellationToken cancellationToken)
+
+        public Task<long?> SendAsync(string to, string message, IReadOnlyList<MessageButton>? buttons, CancellationToken cancellationToken)
         {
             Messages.Add(message);
-            return Task.CompletedTask;
+            return Task.FromResult<long?>(_nextMessageId++);
         }
+
+        public Task ClearButtonsAsync(string chatId, long messageId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task AcknowledgeAsync(string callbackQueryId, string? text, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeGitHubClient : IGitHubClient
