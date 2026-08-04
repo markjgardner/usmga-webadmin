@@ -108,7 +108,7 @@ public sealed class ApproveGuardTests
     private static RequestProcessor NewProcessor(IGitHubClient github, IMessageChannel sms, IStateStore state)
     {
         var telegramOptions = Microsoft.Extensions.Options.Options.Create(new TelegramOptions { Allowlist = "111111111" });
-        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(telegramOptions), telegramOptions, NullLogger<RequestProcessor>.Instance);
+        return new RequestProcessor(github, sms, state, new FakeTokens(), new MessageClassifier(telegramOptions), new RuleBasedIntentClassifier(), telegramOptions, NullLogger<RequestProcessor>.Instance);
     }
 
     private sealed class FakeTokens : ITokenGenerator
@@ -119,12 +119,19 @@ public sealed class ApproveGuardTests
 
     private sealed class FakeSmsClient : IMessageChannel
     {
+        private long _nextMessageId = 1000;
+
         public List<string> Messages { get; } = new();
-        public Task SendAsync(string to, string message, CancellationToken cancellationToken)
+
+        public Task<long?> SendAsync(string to, string message, IReadOnlyList<MessageButton>? buttons, CancellationToken cancellationToken)
         {
             Messages.Add(message);
-            return Task.CompletedTask;
+            return Task.FromResult<long?>(_nextMessageId++);
         }
+
+        public Task ClearButtonsAsync(string chatId, long messageId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task AcknowledgeAsync(string callbackQueryId, string? text, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeGitHubClient : IGitHubClient

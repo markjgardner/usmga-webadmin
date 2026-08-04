@@ -17,19 +17,37 @@ Board member ──Telegram──▶ Telegram Bot ──webhook──▶ Azure F
    │                                                    │
    │                          PR ──▶ GitHub Actions builds /site + deploys SWA preview
    │                                                    │
-   ◀──Telegram "preview URL + code + nonce"── Function (NotifyRequester) ◀── workflow callback
+   ◀──Telegram "preview URL + ✅ Approve / ✏️ Request changes"── Function (NotifyRequester)
    │
-   ├─ reply  "APPROVE <code> <nonce>"  ──▶ Function merges the PR ──▶ Actions deploys production
-   └─ reply  "CHANGES <code>: <text>"  ──▶ Function comments "@copilot …" on the PR (revise)
+   ├─ tap ✅, or reply "looks good"  ──▶ Function merges the PR ──▶ Actions deploys production
+   └─ tap ✏️, or just say what's wrong ──▶ Function comments "@copilot …" on the PR (revise)
 ```
 
-### Telegram command grammar
+### Talking to the bot
 
-| Message | Effect |
+The bot is conversational: it works out **what** you mean and **which** request you mean from
+what is currently in flight for your chat, so codes and nonces never have to be typed.
+
+| You send | Effect |
 | --- | --- |
-| any allowlisted text (not a command) | Opens a new change request (GitHub issue assigned to Copilot). |
-| `APPROVE <code> <nonce>` | Merges the reviewed PR to production. Requires the request code **and** the unguessable nonce from the preview Telegram message, sent from the bound Telegram user ID, matching the reviewed commit SHA with passing checks. |
-| `CHANGES <code>: <text>` | Sends `<text>` to Copilot as a `@copilot` PR comment to revise the change; marks the preview stale. |
+| any text, with nothing in flight | Opens a new change request (GitHub issue assigned to Copilot). |
+| tap **✅ Approve & publish** | Merges the reviewed PR to production. |
+| "looks good" / "lgtm" / "ship it" / "I approve" | Same as tapping ✅. |
+| "ok" / "nice" / "thanks" | Ambiguous, so the bot asks "publish X?" first; answer yes/no. |
+| any other text, while a preview is waiting | Sent to Copilot as a revision to **that** request. |
+| "not yet" / "hold on" | Declines publishing without abandoning the request. |
+| `/new <change>` | Starts a **separate** request instead of revising the pending one. |
+| `/status` | Lists everything in flight. |
+| `/cancel` | Abandons the pending request (the PR stays open on GitHub). |
+| `approve <code>` | Publishes a named request, for when several previews are waiting. |
+| `APPROVE <code> <nonce>` / `CHANGES <code>: <text>` | Legacy explicit syntax; still supported. |
+
+**Resolution order.** When a message doesn't name a request, the bot binds it to: the preview you
+*replied to*, else the only preview awaiting approval, else the only request in flight. If more
+than one preview is waiting, it asks which — it never guesses.
+
+A phrase only counts as approval if the message reduces to *just* that phrase. "Looks good but make
+the logo bigger" is a revision, not an approval.
 
 ## Repository layout
 
@@ -52,9 +70,11 @@ Board member ──Telegram──▶ Telegram Bot ──webhook──▶ Azure F
 
 ## Safety model
 
-- Inbound messages are restricted to an **allowlist** of numeric Telegram user IDs.
-- Approvals require an **unguessable, expiring nonce** bound to the requester's Telegram user ID and the reviewed commit SHA — not just a short code.
-- Merge happens only if the PR head SHA still equals the reviewed SHA **and** required GitHub Actions check-runs + commit statuses pass; the merge call pins the expected `sha` for atomicity.
+- Inbound messages are restricted to an **allowlist** of numeric Telegram user IDs, enforced on button taps (`callback_query.from.id`) as well as on messages.
+- Approvals still require an **unguessable, expiring nonce** bound to the requester's Telegram user ID and the reviewed commit SHA. Conversational approval removes the need to *retype* it, not the need for it to exist: a request is only publishable while its nonce is live, and a button carries that nonce in its `callback_data`.
+- Merge happens only if the PR head SHA still equals the reviewed SHA **and** required GitHub Actions check-runs + commit statuses pass; the merge call pins the expected `sha` for atomicity. **This, not the nonce, is what makes approval safe** — you can only publish the exact commit you previewed, and only if it is green.
+- The nonce is cleared on merge and on every revision, so a stale button or a repeated phrase cannot publish twice.
+- Ambiguous approvals ("ok", "nice") require an explicit confirmation before anything is published; "no" declines without destroying the request.
 - Telegram webhooks are validated by comparing `X-Telegram-Bot-Api-Secret-Token` to the configured webhook secret in constant time; additionally the Function uses `AuthorizationLevel.Function` for defense-in-depth.
 - The function **deduplicates on Telegram update IDs** (claim-then-finalize so transient failures can be retried).
 - `NotifyRequester` requires both a Functions key and a shared-secret header.
@@ -89,9 +109,14 @@ az deployment group create -g <rg> -f infra/main.bicep -p infra/main.parameters.
 
 Then complete the **manual steps** documented in [`infra/README.md`](infra/README.md):
 
-1. Create a Telegram bot with BotFather and register its webhook to point at the Function App's `/api/telegram/webhook` endpoint, using a `secret_token`.
+1. Create a Telegram bot with BotFather and register its webhook to point at the Function App's `/api/telegram/webhook` endpoint, using a `secret_token`. Use [`scripts/register-telegram-webhook.sh`](scripts/register-telegram-webhook.sh) — it sets the required `allowed_updates`.
 2. Store the Telegram bot token, Telegram webhook secret, and the GitHub bot PAT as Key Vault secrets.
 3. Link the Static Web App to this GitHub repository and capture its deployment token.
+
+> **The webhook must be registered with `allowed_updates=["message","callback_query"]`.** Telegram
+> defaults to omitting `callback_query`, and drops those updates *before* they reach the Function —
+> the ✅/✏️ buttons would silently do nothing, with no error anywhere. `setWebhook` also resets this
+> list whenever it is called without `allowed_updates`.
 
 Telegram Key Vault secrets:
 
