@@ -121,7 +121,8 @@ public sealed class GitHubClient : IGitHubClient
             root.GetProperty("user").GetProperty("login").GetString() ?? string.Empty,
             root.GetProperty("html_url").GetString() ?? string.Empty,
             root.TryGetProperty("body", out var body) ? body.GetString() ?? string.Empty : string.Empty,
-            root.TryGetProperty("merged", out var merged) && merged.ValueKind == JsonValueKind.True);
+            root.TryGetProperty("merged", out var merged) && merged.ValueKind == JsonValueKind.True,
+            root.TryGetProperty("state", out var state) && StringComparer.OrdinalIgnoreCase.Equals(state.GetString(), "closed"));
     }
 
     public async Task<int?> GetLinkedIssueNumberForPullRequestAsync(int prNumber, CancellationToken cancellationToken)

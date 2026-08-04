@@ -248,6 +248,69 @@ public sealed class ConversationTests
     }
 
     /// <summary>
+    /// A PR closed directly on GitHub leaves the record claiming it still awaits approval.
+    /// Inferred approval makes that reachable by an offhand "looks good", so it must be
+    /// answered truthfully instead of attempting a merge that can only fail.
+    /// </summary>
+    [Fact]
+    public async Task ApprovingAPullRequestClosedOnGitHubExplainsRatherThanFailingToMerge()
+    {
+        var state = new InMemoryStateStore();
+        await state.CreateRequestAsync(PreviewRecord("QXWHUP"), CancellationToken.None);
+        var github = new FakeGitHub
+        {
+            PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url", string.Empty, Merged: false, Closed: true)
+        };
+        var channel = new FakeChannel();
+
+        await Processor(github, channel, state).HandleMessageAsync(Chat, "looks good, I approve", null, CancellationToken.None);
+
+        Assert.False(github.MergeCalled);
+        Assert.Equal(RequestStatus.Cancelled, (await state.GetByCodeAsync("QXWHUP", CancellationToken.None))!.Status);
+        Assert.Contains("closed on GitHub without being published", channel.Messages.Last().Message);
+    }
+
+    /// <summary>A PR merged outside the bot is live; reporting a merge failure would be a lie.</summary>
+    [Fact]
+    public async Task ApprovingAPullRequestAlreadyMergedOnGitHubReportsItAsPublished()
+    {
+        var state = new InMemoryStateStore();
+        await state.CreateRequestAsync(PreviewRecord("QXWHUP"), CancellationToken.None);
+        var github = new FakeGitHub
+        {
+            PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url", string.Empty, Merged: true)
+        };
+        var channel = new FakeChannel();
+
+        await Processor(github, channel, state).HandleMessageAsync(Chat, "looks good, I approve", null, CancellationToken.None);
+
+        Assert.False(github.MergeCalled);
+        var record = (await state.GetByCodeAsync("QXWHUP", CancellationToken.None))!;
+        Assert.Equal(RequestStatus.Merged, record.Status);
+        Assert.Null(record.ApprovalNonce);
+        Assert.Contains("already published", channel.Messages.Last().Message);
+    }
+
+    /// <summary>A closed PR must not be silently treated as approvable by the status listing either.</summary>
+    [Fact]
+    public async Task AClosedPullRequestReleasesTheRequestSoALaterMessageStartsFresh()
+    {
+        var state = new InMemoryStateStore();
+        await state.CreateRequestAsync(PreviewRecord("QXWHUP"), CancellationToken.None);
+        var github = new FakeGitHub
+        {
+            PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url", string.Empty, Merged: false, Closed: true)
+        };
+        var channel = new FakeChannel();
+        var processor = Processor(github, channel, state);
+
+        await processor.HandleMessageAsync(Chat, "looks good, I approve", null, CancellationToken.None);
+        await processor.HandleMessageAsync(Chat, "add a favicon to the site", null, CancellationToken.None);
+
+        Assert.Equal(1, github.CreateIssueCalls);
+    }
+
+    /// <summary>
     /// A half-typed legacy command must not be forwarded to Copilot verbatim, nor opened as
     /// an issue whose body is "APPROVE abc123".
     /// </summary>

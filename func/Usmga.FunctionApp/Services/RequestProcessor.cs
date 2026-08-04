@@ -413,6 +413,39 @@ public sealed class RequestProcessor
         }
 
         var pr = await _gitHub.GetPullRequestAsync(record.PrNumber.Value, cancellationToken);
+
+        // The PR may have been resolved outside this conversation — merged or closed
+        // directly on GitHub. Both leave the record claiming it is still awaiting
+        // approval, and natural-language approval makes that stale record reachable by
+        // an offhand "looks good" rather than a deliberately typed code, so both need a
+        // truthful answer rather than a raw merge error.
+        if (pr.Merged)
+        {
+            record.Status = RequestStatus.Merged;
+            record.LastError = null;
+            record.AwaitingConfirmationUntil = null;
+            record.ApprovalNonce = null;
+            record.ApprovalNonceExpiresAt = null;
+            record.UpdatedAt = DateTimeOffset.UtcNow;
+            await _state.SaveRequestAsync(record, cancellationToken);
+            await ClearPreviewButtonsAsync(from, record, cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} was already published to the live site.", cancellationToken);
+            return;
+        }
+
+        if (pr.Closed)
+        {
+            record.Status = RequestStatus.Cancelled;
+            record.AwaitingConfirmationUntil = null;
+            record.ApprovalNonce = null;
+            record.ApprovalNonceExpiresAt = null;
+            record.UpdatedAt = DateTimeOffset.UtcNow;
+            await _state.SaveRequestAsync(record, cancellationToken);
+            await ClearPreviewButtonsAsync(from, record, cancellationToken);
+            await _channel.SendAsync(from, $"Request {code} was closed on GitHub without being published, so there is nothing to approve. Send the change again to start over.", cancellationToken);
+            return;
+        }
+
         if (!StringComparer.OrdinalIgnoreCase.Equals(pr.HeadSha, record.ReviewedSha))
         {
             record.Status = RequestStatus.Stale;
