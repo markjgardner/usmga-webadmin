@@ -15,6 +15,9 @@ site/_site/
 publish/
 *.zip
 
+# Compiled ARM template (regenerate with `az bicep build --file infra/main.bicep`)
+infra/main.json
+
 # Logs and OS files
 *.log
 .DS_Store
