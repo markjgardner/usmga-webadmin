@@ -49,6 +49,17 @@ The bot infers intent and target from state rather than requiring codes and nonc
 - The approval nonce is still required to *exist* and be unexpired (`RequestRecord.IsApprovable()`) — it is simply never retyped. Buttons carry it in `callback_data` (`CallbackAction`, 64-byte cap).
 - The webhook must be registered with `allowed_updates=["message","callback_query"]` (`scripts/register-telegram-webhook.sh`); otherwise Telegram silently drops button taps.
 
+### Concurrency & multi-user isolation
+
+The bot is designed for many authorized users messaging it at once, each with their own independent requests. The invariants that keep concurrent traffic safe:
+
+- **Per-chat state isolation.** `ConversationContext` is built only from `ListActiveForChatAsync`, which filters Table Storage by `RequesterChatId` (the authenticated chat id from the update). One user's messages can only ever resolve to that user's own requests — intent resolution never sees another chat's records. Preserve this filter on any new query path.
+- **Exactly-once update handling.** `TryClaimMessageAsync` does an atomic Table `AddEntity` on `(message, updateId)`; a duplicate/redelivered update loses the 409 race and is ignored. The claim is released on exception so a failed update retries, and finalized with `CompleteMessageAsync` on success. Both the `message` and `callback_query` paths claim before doing work.
+- **Request identity.** Each new request gets a random 6-char code from a 32-char alphabet (~1.07e9 space) used as the Table `RowKey` in the `request` partition. `CreateRequestAsync` uses `AddEntity`, so a code collision surfaces as a 409. Note: `HandleNewRequestAsync` does **not** retry on collision — the update fails and Telegram retries it (a fresh code is drawn on retry). If write volume ever grows, add a bounded regenerate-and-retry loop.
+- **Stateless singletons.** All services are singletons and hold no per-request mutable state (`TableStateStore` wraps a thread-safe `TableClient`), so a single instance serves concurrent invocations safely. Keep new services stateless or explicitly synchronized.
+- **Approval races.** Merge safety is per-record and self-checking: exact reviewed-SHA match, green checks, draft→ready, and a truthful early-out when the PR was already merged/closed on GitHub. Two taps on the same preview are safe because the second sees the merged/closed PR and reports it rather than re-merging.
+
+
 ### DI and configuration
 
 `Program.cs` uses the options pattern binding four config sections:
