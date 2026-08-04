@@ -58,6 +58,7 @@ Board member ──Telegram──▶ Telegram Bot ──webhook──▶ Azure F
 - Telegram webhooks are validated by comparing `X-Telegram-Bot-Api-Secret-Token` to the configured webhook secret in constant time; additionally the Function uses `AuthorizationLevel.Function` for defense-in-depth.
 - The function **deduplicates on Telegram update IDs** (claim-then-finalize so transient failures can be retried).
 - `NotifyRequester` requires both a Functions key and a shared-secret header.
+- `NotifyRequester` returns `204 No Content` when a preview has no originating request (a human-authored PR), so those previews do not fail the workflow.
 - **Branch protection** on `main` (see `scripts/setup-branch-protection.sh`) is the backstop that prevents merging unbuilt/failing code.
 
 ## Getting started (development)

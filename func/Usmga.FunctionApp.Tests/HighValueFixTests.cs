@@ -149,6 +149,20 @@ public sealed class HighValueFixTests
         Assert.Equal(RequestStatus.PreviewDeployed, saved.Status);
     }
 
+    [Fact]
+    public async Task NotifyPreviewReportsNoRecordInsteadOfThrowing()
+    {
+        var state = new InMemoryStateStore();
+        var github = new FakeGitHubClient { LinkedIssueNumber = null };
+        var sms = new FakeSmsClient();
+
+        var notified = await NewProcessor(github, sms, state)
+            .NotifyPreviewAsync(new NotifyRequest { PrNumber = 99, PreviewUrl = "https://preview", DeployedSha = "sha" }, CancellationToken.None);
+
+        Assert.False(notified);
+        Assert.Empty(sms.Messages);
+    }
+
     private static RequestRecord PreviewRecord() => new()
     {
         Code = "ABC123",
