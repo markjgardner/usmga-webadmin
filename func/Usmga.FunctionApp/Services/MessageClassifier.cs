@@ -11,6 +11,7 @@ public sealed class MessageClassifier
     private static readonly Regex ApprovePrefixPattern = new(@"^\s*APPROVE\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex ChangesPattern = new(@"^\s*CHANGES\s+(?<code>[A-Za-z0-9-]+)\s*:\s*(?<text>.+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.Singleline);
     private static readonly Regex ChangesPrefixPattern = new(@"^\s*CHANGES\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ApprovalIntentPattern = new(@"\b(approve|approved|approves|approving|approval)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private readonly HashSet<string> _allowed;
 
     public MessageClassifier(IOptions<TelegramOptions> options)
@@ -43,6 +44,11 @@ public sealed class MessageClassifier
         if (ChangesPrefixPattern.IsMatch(message ?? string.Empty))
         {
             return new InboundCommand(InboundCommandKind.Invalid, null, null, "Reply CHANGES <code>: <requested revision>.");
+        }
+
+        if (ApprovalIntentPattern.IsMatch(message ?? string.Empty))
+        {
+            return new InboundCommand(InboundCommandKind.Invalid, null, null, "To publish a preview, reply APPROVE <code> <approval-nonce> exactly as shown in the preview message. If you meant to start a new request, rephrase it without the word \"approve\".");
         }
 
         return new InboundCommand(InboundCommandKind.NewRequest, null, null, (message ?? string.Empty).Trim());

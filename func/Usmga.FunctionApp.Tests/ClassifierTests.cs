@@ -43,6 +43,16 @@ public sealed class ClassifierTests
     }
 
     [Theory]
+    [InlineData("Looks good. I approve.")]
+    [InlineData("Approved!")]
+    [InlineData("i approve this change")]
+    public void RejectsFreeformApprovalInsteadOfNewRequest(string message)
+    {
+        var command = Classifier().Classify(message);
+        Assert.Equal(InboundCommandKind.Invalid, command.Kind);
+    }
+
+    [Theory]
     [InlineData("111111111", true)]
     [InlineData("222222222", true)]
     [InlineData("333333333", false)]
