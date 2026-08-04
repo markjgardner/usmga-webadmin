@@ -5,7 +5,7 @@ public sealed record GitHubIssue(int Number, string HtmlUrl, bool CopilotAssigne
     public GitHubIssue(int number, string htmlUrl) : this(number, htmlUrl, true) { }
 }
 
-public sealed record GitHubPullRequest(int Number, string HeadSha, string HeadRef, string AuthorLogin, string HtmlUrl, string Body = "");
+public sealed record GitHubPullRequest(int Number, string HeadSha, string HeadRef, string AuthorLogin, string HtmlUrl, string Body = "", bool Draft = false, string NodeId = "");
 
 public enum CheckState { Passed, Pending, Failed }
 

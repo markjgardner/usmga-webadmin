@@ -31,6 +31,35 @@ public sealed class HighValueFixTests
     }
 
     [Fact]
+    public async Task ApproveMarksDraftPullRequestReadyBeforeMerging()
+    {
+        var state = new InMemoryStateStore();
+        await state.CreateRequestAsync(PreviewRecord(), CancellationToken.None);
+        var github = new FakeGitHubClient { PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url", Draft: true, NodeId: "PR_node"), Checks = new CheckStatus(CheckState.Passed, "ok") };
+        var sms = new FakeSmsClient();
+
+        await NewProcessor(github, sms, state).HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+
+        Assert.True(github.MarkReadyCalled);
+        Assert.True(github.MergeCalled);
+        Assert.Equal(RequestStatus.Merged, (await state.GetByCodeAsync("ABC123", CancellationToken.None))!.Status);
+    }
+
+    [Fact]
+    public async Task ApproveDoesNotMarkReadyWhenPullRequestIsNotDraft()
+    {
+        var state = new InMemoryStateStore();
+        await state.CreateRequestAsync(PreviewRecord(), CancellationToken.None);
+        var github = new FakeGitHubClient { PullRequest = new GitHubPullRequest(42, "reviewed-sha", "copilot/test", "copilot-swe-agent[bot]", "url", Draft: false, NodeId: "PR_node"), Checks = new CheckStatus(CheckState.Passed, "ok") };
+        var sms = new FakeSmsClient();
+
+        await NewProcessor(github, sms, state).HandleApproveAsync("+15550000001", "ABC123", "nonce", CancellationToken.None);
+
+        Assert.False(github.MarkReadyCalled);
+        Assert.True(github.MergeCalled);
+    }
+
+    [Fact]
     public async Task ApproveWithFailingChecksDoesNotMergeAndMarksStale()
     {
         var state = new InMemoryStateStore();
@@ -199,6 +228,7 @@ public sealed class HighValueFixTests
         public int? LinkedIssueNumber { get; set; }
         public bool MergeCalled { get; private set; }
         public bool CommentCalled { get; private set; }
+        public bool MarkReadyCalled { get; private set; }
         public string? ExpectedSha { get; private set; }
         public int CreateIssueCalls { get; private set; }
         public Task EnsureCopilotAssignableAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -216,6 +246,11 @@ public sealed class HighValueFixTests
             MergeCalled = true;
             ExpectedSha = expectedSha;
             return Task.FromResult(new MergeResult(true, "merged"));
+        }
+        public Task MarkPullRequestReadyForReviewAsync(string nodeId, CancellationToken cancellationToken)
+        {
+            MarkReadyCalled = true;
+            return Task.CompletedTask;
         }
         public Task PostCopilotPrCommentAsync(int prNumber, string text, CancellationToken cancellationToken)
         {
