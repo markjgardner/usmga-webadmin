@@ -1,8 +1,10 @@
 name: CI
 
 # Runs on every pull request with NO `paths:` filter on purpose: these jobs are
-# required status checks for branch protection. A path filter would leave a required
-# context permanently "pending" on PRs that don't touch that path, deadlocking merges.
+# intended to be configured as required status checks for branch protection on
+# `main` (see repo Settings > Branches). If they are made required, a `paths:`
+# filter would leave a required context permanently "pending" on PRs that don't
+# touch that path, deadlocking merges — so do not add one.
 on:
   pull_request:
     types: [opened, synchronize, reopened]
