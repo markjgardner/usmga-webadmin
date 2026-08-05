@@ -190,6 +190,13 @@ figcaption { color: var(--muted); font-size: .9em; line-height: 1.6; text-align:
 
 .text-center { text-align: center; }
 
+/* ---------- Competition entry rows ---------- */
+.entry-row { margin-top: 1.5em; margin-bottom: 1.5em; }
+.entry-row p { margin: 0; }
+.entry-qr { margin: 0; }
+.entry-qr img { margin: 0; width: 150px; max-width: 100%; }
+.entry-paypal { font-size: 1.5em; line-height: 1.4; }
+
 /* Emphasis sizes lifted from the live theme inline font overrides. */
 .lead { margin: 0 0 20px; font-size: 32px; font-weight: 700; line-height: 33px; color: #2a2a2a; }
 .lead-muted { margin: 0 0 20px; font-size: 32px; font-weight: 700; line-height: 33px; color: var(--body-text); }
