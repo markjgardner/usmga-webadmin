@@ -190,6 +190,20 @@ figcaption { color: var(--muted); font-size: .9em; line-height: 1.6; text-align:
 
 .text-center { text-align: center; }
 
+/* Keep two-column figure grids (e.g. international team photos) exactly two-up. */
+.figure-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+/* QR codes keep their natural size, even inside multi-column rows. */
+figure.qr { margin: 0; }
+figure.qr img { width: 150px; max-width: 100%; }
+.multicol figure.qr img { width: 150px; }
+
+/* Top-align columns that hold long text or stacked blocks. */
+.multicol.align-start { align-items: start; }
+
+/* Styled divider used on the Sponsor Us page. */
+.styled-hr { border: 0; border-top: 1px solid var(--body-text); opacity: .35; margin: 1.5em 0; }
+
 /* ---------- Competition entry rows ---------- */
 .entry-row { margin-top: 1.5em; margin-bottom: 1.5em; }
 .entry-row p { margin: 0; }
