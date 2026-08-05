@@ -190,13 +190,32 @@ figcaption { color: var(--muted); font-size: .9em; line-height: 1.6; text-align:
 
 .text-center { text-align: center; }
 
+/* Keep two-column figure grids (e.g. international team photos) exactly two-up. */
+.figure-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+/* QR codes keep their natural size, even inside multi-column rows. */
+figure.qr { margin: 0; }
+figure.qr img { width: 150px; max-width: 100%; }
+.multicol figure.qr img { width: 150px; }
+
+/* Top-align columns that hold long text or stacked blocks. */
+.multicol.align-start { align-items: start; }
+
+/* Styled divider used on the Sponsor Us page. */
+.styled-hr { border: 0; border-top: 1px solid var(--body-text); opacity: .35; margin: 1.5em 0; }
+
+/* ---------- Competition entry rows ---------- */
+.entry-row { margin-top: 1.5em; margin-bottom: 1.5em; }
+.entry-row p { margin: 0; }
+.entry-qr { margin: 0; }
+.entry-qr img { margin: 0; width: 150px; max-width: 100%; }
+.entry-paypal { font-size: 1.5em; line-height: 1.4; }
+
 /* Emphasis sizes lifted from the live theme inline font overrides. */
 .lead { margin: 0 0 20px; font-size: 32px; font-weight: 700; line-height: 33px; color: #2a2a2a; }
 .lead-muted { margin: 0 0 20px; font-size: 32px; font-weight: 700; line-height: 33px; color: var(--body-text); }
 .social-heading { margin: 0 0 10px; font-size: 24px; font-weight: 700; line-height: 33px; color: var(--muted); }
 #main-wrap h2.h2-soft { color: #2a2a2a; }
-#main-wrap h2.h2-small { font-size: 16px; line-height: 44px; }
-.founded { color: #000; }
 
 /* ---------- Social glyphs ---------- */
 .social-links li { margin: 0; }
