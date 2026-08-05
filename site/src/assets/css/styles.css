@@ -202,8 +202,6 @@ figcaption { color: var(--muted); font-size: .9em; line-height: 1.6; text-align:
 .lead-muted { margin: 0 0 20px; font-size: 32px; font-weight: 700; line-height: 33px; color: var(--body-text); }
 .social-heading { margin: 0 0 10px; font-size: 24px; font-weight: 700; line-height: 33px; color: var(--muted); }
 #main-wrap h2.h2-soft { color: #2a2a2a; }
-#main-wrap h2.h2-small { font-size: 16px; line-height: 44px; }
-.founded { color: #000; }
 
 /* ---------- Social glyphs ---------- */
 .social-links li { margin: 0; }
